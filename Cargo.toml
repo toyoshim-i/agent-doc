@@ -1,6 +1,6 @@
 [package]
 name = "agent-doc"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 authors = ["Takashi Toyoshima <toyoshim@gmail.com>"]
 license = "MIT OR Apache-2.0"
@@ -9,6 +9,10 @@ repository = "https://github.com/toyoshim-i/agent-doc"
 readme = "README.md"
 keywords = ["cli", "documentation", "agent", "markdown", "hyperlink"]
 categories = ["command-line-utilities", "development-tools"]
+
+[features]
+default = []
+build = []
 
 [dependencies]
 serde = { version = "1.0", features = ["derive"] }

@@ -3,6 +3,9 @@ pub mod model;
 pub mod parser;
 pub mod renderer;
 
+#[cfg(feature = "build")]
+pub mod build;
+
 pub use index::DocIndex;
 pub use model::{DocPage, DocSection, RenderMode, ResolvedLink, TopicSummary};
 pub use parser::parse_markdown_page;
@@ -47,12 +50,14 @@ impl DocEngine {
         self.index.add_page(page);
     }
 
-    pub fn add_pages<'a, I>(&mut self, pages: I)
+    pub fn add_pages<I, S1, S2>(&mut self, pages: I)
     where
-        I: IntoIterator<Item = (&'a str, &'a str)>,
+        I: IntoIterator<Item = (S1, S2)>,
+        S1: AsRef<str>,
+        S2: AsRef<str>,
     {
         for (path, content) in pages {
-            self.add_page(path, content);
+            self.add_page(path.as_ref(), content.as_ref());
         }
     }
 
