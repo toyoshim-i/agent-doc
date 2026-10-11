@@ -6,6 +6,9 @@ pub mod renderer;
 #[cfg(feature = "build")]
 pub mod build;
 
+#[cfg(feature = "mcp")]
+pub mod mcp;
+
 pub use index::DocIndex;
 pub use model::{
     default_categories, BrokenLink, CategoryConfig, CodeBlock, DocPage, DocSection, RenderMode,
@@ -540,6 +543,108 @@ impl DocEngine {
         actual: &str,
     ) -> Result<(), String> {
         assert_or_bless(file_path, actual)
+    }
+
+    /// List all documentation pages as MCP resources (`<scheme>://doc/<id>`).
+    #[cfg(feature = "mcp")]
+    pub fn mcp_list_resources(&self) -> Vec<mcp::McpResource> {
+        self.index
+            .pages
+            .iter()
+            .map(|p| mcp::McpResource {
+                uri: format!("{}://doc/{}", self.scheme, p.id),
+                name: p.title.clone(),
+                description: p.summary.clone(),
+                mime_type: "text/markdown".to_string(),
+            })
+            .collect()
+    }
+
+    /// Read an MCP documentation resource by URI.
+    #[cfg(feature = "mcp")]
+    pub fn mcp_read_resource(&self, uri: &str) -> Result<mcp::McpResourceContents, DocError> {
+        let prefix = format!("{}://doc/", self.scheme);
+        let without_prefix = uri
+            .strip_prefix(&prefix)
+            .ok_or_else(|| DocError::NotFound(format!("Invalid resource URI: {uri}")))?;
+
+        let (id, anchor) = match without_prefix.split_once('#') {
+            Some((i, a)) => (i, Some(a)),
+            None => (without_prefix, None),
+        };
+
+        let page = self
+            .index
+            .lookup_exact(id)
+            .ok_or_else(|| DocError::NotFound(id.to_string()))?;
+
+        let text = if let Some(anchor) = anchor {
+            let sec = page
+                .sections
+                .iter()
+                .find(|s| s.anchor == anchor || crate::parser::slugify(&s.heading) == anchor)
+                .ok_or_else(|| DocError::NotFound(format!("Section '{anchor}' in topic '{id}'")))?;
+            format!("## {}\n\n{}", sec.heading, sec.content)
+        } else {
+            self.explain(id, RenderMode::Mcp)?
+        };
+
+        Ok(mcp::McpResourceContents {
+            uri: uri.to_string(),
+            mime_type: "text/markdown".to_string(),
+            text,
+        })
+    }
+
+    /// Invoke an MCP tool by name. Handles built-in `doc_list` and `doc_read` tools.
+    #[cfg(feature = "mcp")]
+    pub fn mcp_call_tool(
+        &self,
+        name: &str,
+        args: serde_json::Value,
+    ) -> Result<mcp::ToolResult, DocError> {
+        match name {
+            "doc_list" => {
+                let topics = self.list_topics(None);
+                let mut out = String::new();
+                for t in topics {
+                    out.push_str(&format!("- {}: {} ({})\n", t.id, t.title, t.summary));
+                }
+                Ok(mcp::ToolResult::text(out))
+            }
+            "doc_read" => {
+                let id = match args.get("id").and_then(|v| v.as_str()) {
+                    Some(i) => i,
+                    None => return Ok(mcp::ToolResult::error("Missing required argument 'id'")),
+                };
+
+                let page = match self.index.lookup_exact(id) {
+                    Some(p) => p,
+                    None => return Ok(mcp::ToolResult::error(format!("Topic '{id}' not found"))),
+                };
+
+                if let Some(section) = args.get("section").and_then(|v| v.as_str()) {
+                    if let Some(sec) = page
+                        .sections
+                        .iter()
+                        .find(|s| s.anchor == section || crate::parser::slugify(&s.heading) == section)
+                    {
+                        Ok(mcp::ToolResult::text(format!(
+                            "## {}\n\n{}",
+                            sec.heading, sec.content
+                        )))
+                    } else {
+                        Ok(mcp::ToolResult::error(format!(
+                            "Section '{section}' not found in topic '{id}'"
+                        )))
+                    }
+                } else {
+                    let text = self.explain(id, RenderMode::Mcp)?;
+                    Ok(mcp::ToolResult::text(text))
+                }
+            }
+            _ => Ok(mcp::ToolResult::error(format!("Unknown tool: '{name}'"))),
+        }
     }
 }
 
