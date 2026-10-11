@@ -601,12 +601,13 @@ impl DocEngine {
     }
 
     /// Invoke an MCP tool by name. Handles built-in `doc_list` and `doc_read` tools.
+    /// Invoke an MCP tool by name and return a `HandlerResult` (Ready or Pending).
     #[cfg(feature = "mcp")]
-    pub fn mcp_call_tool(
+    pub fn mcp_call_tool_handler(
         &self,
         name: &str,
         args: serde_json::Value,
-    ) -> Result<mcp::ToolResult, DocError> {
+    ) -> mcp::HandlerResult<mcp::ToolResult> {
         match name {
             "doc_list" => {
                 let topics = self.list_topics(None);
@@ -614,17 +615,25 @@ impl DocEngine {
                 for t in topics {
                     out.push_str(&format!("- {}: {} ({})\n", t.id, t.title, t.summary));
                 }
-                Ok(mcp::ToolResult::text(out))
+                mcp::HandlerResult::Ready(mcp::ToolResult::text(out))
             }
             "doc_read" => {
                 let id = match args.get("id").and_then(|v| v.as_str()) {
                     Some(i) => i,
-                    None => return Ok(mcp::ToolResult::error("Missing required argument 'id'")),
+                    None => {
+                        return mcp::HandlerResult::Ready(mcp::ToolResult::error(
+                            "Missing required argument 'id'",
+                        ))
+                    }
                 };
 
                 let page = match self.index.lookup_exact(id) {
                     Some(p) => p,
-                    None => return Ok(mcp::ToolResult::error(format!("Topic '{id}' not found"))),
+                    None => {
+                        return mcp::HandlerResult::Ready(mcp::ToolResult::error(format!(
+                            "Topic '{id}' not found"
+                        )))
+                    }
                 };
 
                 if let Some(section) = args.get("section").and_then(|v| v.as_str()) {
@@ -633,52 +642,94 @@ impl DocEngine {
                         .iter()
                         .find(|s| s.anchor == section || crate::parser::slugify(&s.heading) == section)
                     {
-                        Ok(mcp::ToolResult::text(format!(
+                        mcp::HandlerResult::Ready(mcp::ToolResult::text(format!(
                             "## {}\n\n{}",
                             sec.heading, sec.content
                         )))
                     } else {
-                        Ok(mcp::ToolResult::error(format!(
+                        mcp::HandlerResult::Ready(mcp::ToolResult::error(format!(
                             "Section '{section}' not found in topic '{id}'"
                         )))
                     }
                 } else {
-                    let text = self.explain(id, RenderMode::Mcp)?;
-                    Ok(mcp::ToolResult::text(text))
+                    match self.explain(id, RenderMode::Mcp) {
+                        Ok(text) => mcp::HandlerResult::Ready(mcp::ToolResult::text(text)),
+                        Err(e) => mcp::HandlerResult::Ready(mcp::ToolResult::error(e.to_string())),
+                    }
                 }
             }
             _ => {
                 if let Some(tool) = self.tools.iter().find(|t| t.name == name) {
                     if !tool.skip_validation {
                         if let Err(val_err) = tool.validate_args(&args, &self.scheme) {
-                            return Ok(val_err);
+                            return mcp::HandlerResult::Ready(val_err);
                         }
                     }
-                    let res = (tool.handler)(args);
-                    match res {
-                        mcp::HandlerResult::Ready(r) => Ok(r),
-                        mcp::HandlerResult::Pending(p) => {
-                            #[allow(unused_mut)]
-                            let mut p = p;
-                            #[cfg(not(target_arch = "wasm32"))]
-                            {
-                                Ok(p.settled())
-                            }
-                            #[cfg(target_arch = "wasm32")]
-                            {
-                                if let Some(r) = p.poll_settled() {
-                                    Ok(r)
-                                } else {
-                                    Ok(mcp::ToolResult::error("Tool execution pending in wasm environment"))
-                                }
-                            }
-                        }
-                    }
+                    (tool.handler)(args)
                 } else {
-                    Ok(mcp::ToolResult::error(format!("Unknown tool: '{name}'")))
+                    mcp::HandlerResult::Ready(mcp::ToolResult::error(format!(
+                        "Unknown tool: '{name}'"
+                    )))
                 }
             }
         }
+    }
+
+    /// Invoke an MCP tool synchronously by name, blocking if pending (on supported platforms).
+    #[cfg(feature = "mcp")]
+    pub fn mcp_call_tool(
+        &self,
+        name: &str,
+        args: serde_json::Value,
+    ) -> Result<mcp::ToolResult, DocError> {
+        match self.mcp_call_tool_handler(name, args) {
+            mcp::HandlerResult::Ready(r) => Ok(r),
+            mcp::HandlerResult::Pending(p) => {
+                #[cfg(not(target_arch = "wasm32"))]
+                {
+                    Ok(p.settled())
+                }
+                #[cfg(target_arch = "wasm32")]
+                {
+                    let mut p = p;
+                    if let Some(r) = p.poll_settled() {
+                        Ok(r)
+                    } else {
+                        Ok(mcp::ToolResult::error(
+                            "Tool execution pending in wasm environment",
+                        ))
+                    }
+                }
+            }
+        }
+    }
+
+    /// Handle a raw JSON-RPC request string directly without network I/O.
+    #[cfg(feature = "mcp")]
+    pub fn handle(&self, request: &str) -> mcp::HandlerResult<Option<String>> {
+        mcp::protocol::handle_json_rpc(self, request)
+    }
+
+    /// Serve MCP JSON-RPC protocol over standard input/output.
+    #[cfg(feature = "mcp-stdio")]
+    pub fn serve_stdio(&self) -> std::io::Result<()> {
+        mcp::stdio::serve_stdio(self)
+    }
+
+    /// Serve MCP JSON-RPC protocol over custom reader and writer streams.
+    #[cfg(feature = "mcp-stdio")]
+    pub fn serve_stdio_io<R: std::io::BufRead, W: std::io::Write>(
+        &self,
+        reader: R,
+        writer: W,
+    ) -> std::io::Result<()> {
+        mcp::stdio::serve_stdio_io(self, reader, writer)
+    }
+
+    /// Serve MCP JSON-RPC protocol over HTTP loopback.
+    #[cfg(feature = "mcp-http")]
+    pub fn serve_http(&self, addr: impl std::net::ToSocketAddrs) -> std::io::Result<()> {
+        mcp::http::serve_http(self, addr)
     }
 
     /// Register a custom tool for MCP execution.
