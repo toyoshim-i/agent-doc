@@ -31,6 +31,8 @@ pub struct DocEngine {
     pub scheme: String,
     pub index: DocIndex,
     pub categories: Vec<CategoryConfig>,
+    #[cfg(feature = "mcp")]
+    pub tools: Vec<mcp::Tool>,
 }
 
 impl DocEngine {
@@ -43,6 +45,8 @@ impl DocEngine {
             explain_subcommand: "explain".to_string(),
             index: DocIndex::new(),
             categories: default_categories(),
+            #[cfg(feature = "mcp")]
+            tools: Vec::new(),
         }
     }
 
@@ -643,8 +647,110 @@ impl DocEngine {
                     Ok(mcp::ToolResult::text(text))
                 }
             }
-            _ => Ok(mcp::ToolResult::error(format!("Unknown tool: '{name}'"))),
+            _ => {
+                if let Some(tool) = self.tools.iter().find(|t| t.name == name) {
+                    if let Err(val_err) = tool.validate_args(&args, &self.scheme) {
+                        return Ok(val_err);
+                    }
+                    let res = (tool.handler)(args);
+                    match res {
+                        mcp::HandlerResult::Ready(r) => Ok(r),
+                        mcp::HandlerResult::Pending(p) => {
+                            #[allow(unused_mut)]
+                            let mut p = p;
+                            #[cfg(not(target_arch = "wasm32"))]
+                            {
+                                Ok(p.settled())
+                            }
+                            #[cfg(target_arch = "wasm32")]
+                            {
+                                if let Some(r) = p.poll_settled() {
+                                    Ok(r)
+                                } else {
+                                    Ok(mcp::ToolResult::error("Tool execution pending in wasm environment"))
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    Ok(mcp::ToolResult::error(format!("Unknown tool: '{name}'")))
+                }
+            }
         }
+    }
+
+    /// Register a custom tool for MCP execution.
+    #[cfg(feature = "mcp")]
+    pub fn register_tool(&mut self, tool: mcp::Tool) {
+        self.tools.push(tool);
+    }
+
+    /// Builder helper to attach a tool.
+    #[cfg(feature = "mcp")]
+    pub fn with_tool(mut self, tool: mcp::Tool) -> Self {
+        self.tools.push(tool);
+        self
+    }
+
+    /// List all available MCP tools including built-in doc tools and registered host tools.
+    #[cfg(feature = "mcp")]
+    pub fn mcp_list_tools(&self) -> Vec<mcp::McpToolDefinition> {
+        let mut list = vec![
+            mcp::McpToolDefinition {
+                name: "doc_list".to_string(),
+                description: "List all available documentation topics and summaries".to_string(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {},
+                }),
+            },
+            mcp::McpToolDefinition {
+                name: "doc_read".to_string(),
+                description: "Read documentation page by ID or extract a specific section by anchor".to_string(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "id": { "type": "string", "description": "Documentation page ID" },
+                        "section": { "type": "string", "description": "Optional section anchor" }
+                    },
+                    "required": ["id"]
+                }),
+            },
+        ];
+
+        for t in &self.tools {
+            list.push(t.to_mcp_definition(&self.scheme));
+        }
+
+        list
+    }
+
+    /// Verify tool definitions for consistency:
+    /// - Checks that all `.see` references point to existing documentation page IDs.
+    /// - Checks that all `.example` payloads pass argument schema validation.
+    #[cfg(feature = "mcp")]
+    pub fn check_tools(&self) -> Vec<String> {
+        let mut issues = Vec::new();
+        for tool in &self.tools {
+            if let Some(ref see) = tool.see_page {
+                if self.index.lookup_exact(see).is_none() {
+                    issues.push(format!(
+                        "Tool '{}' references nonexistent documentation page in .see('{}')",
+                        tool.name, see
+                    ));
+                }
+            }
+
+            for (idx, example) in tool.examples.iter().enumerate() {
+                if let Err(err) = tool.validate_args(example, &self.scheme) {
+                    issues.push(format!(
+                        "Tool '{}' example #{} failed schema validation: {:?}",
+                        tool.name, idx, err
+                    ));
+                }
+            }
+        }
+        issues
     }
 }
 
