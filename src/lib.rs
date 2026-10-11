@@ -649,8 +649,10 @@ impl DocEngine {
             }
             _ => {
                 if let Some(tool) = self.tools.iter().find(|t| t.name == name) {
-                    if let Err(val_err) = tool.validate_args(&args, &self.scheme) {
-                        return Ok(val_err);
+                    if !tool.skip_validation {
+                        if let Err(val_err) = tool.validate_args(&args, &self.scheme) {
+                            return Ok(val_err);
+                        }
                     }
                     let res = (tool.handler)(args);
                     match res {
@@ -690,6 +692,18 @@ impl DocEngine {
     pub fn with_tool(mut self, tool: mcp::Tool) -> Self {
         self.tools.push(tool);
         self
+    }
+
+    /// Register clap subcommands as MCP tools, parsing inputs through clap's parser.
+    #[cfg(all(feature = "mcp", feature = "clap"))]
+    pub fn register_clap_tools<F>(&mut self, cmd: ::clap::Command, exclude: &[&str], handler: F)
+    where
+        F: Fn(&str, ::clap::ArgMatches) -> mcp::HandlerResult<mcp::ToolResult> + Send + Sync + 'static,
+    {
+        let tools = mcp::clap::tools_from_clap(cmd, exclude, handler);
+        for tool in tools {
+            self.register_tool(tool);
+        }
     }
 
     /// List all available MCP tools including built-in doc tools and registered host tools.

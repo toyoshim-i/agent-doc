@@ -41,6 +41,7 @@ pub struct Tool {
     pub see_page: Option<String>,
     pub examples: Vec<serde_json::Value>,
     pub handler: ToolHandler,
+    pub skip_validation: bool,
 }
 
 impl std::fmt::Debug for Tool {
@@ -235,6 +236,7 @@ pub struct ToolBuilder {
     see_page: Option<String>,
     examples: Vec<serde_json::Value>,
     handler: Option<ToolHandler>,
+    skip_validation: bool,
 }
 
 impl ToolBuilder {
@@ -246,6 +248,7 @@ impl ToolBuilder {
             see_page: None,
             examples: Vec::new(),
             handler: None,
+            skip_validation: false,
         }
     }
 
@@ -275,6 +278,11 @@ impl ToolBuilder {
         self
     }
 
+    pub fn skip_validation(mut self, skip: bool) -> Self {
+        self.skip_validation = skip;
+        self
+    }
+
     pub fn handler<F>(mut self, handler: F) -> Self
     where
         F: Fn(serde_json::Value) -> HandlerResult<ToolResult> + Send + Sync + 'static,
@@ -290,6 +298,7 @@ impl ToolBuilder {
             params: self.params,
             see_page: self.see_page,
             examples: self.examples,
+            skip_validation: self.skip_validation,
             handler: self
                 .handler
                 .unwrap_or_else(|| Arc::new(|_| ToolResult::error("Handler not implemented").into())),
