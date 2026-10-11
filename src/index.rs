@@ -38,6 +38,38 @@ impl DocIndex {
         self.pages.push(page);
     }
 
+    /// Exact match on page id or aliases (case-insensitive).
+    pub fn lookup_exact(&self, query: &str) -> Option<&DocPage> {
+        let q = query.trim();
+        for page in &self.pages {
+            if page.id.eq_ignore_ascii_case(q)
+                || page.aliases.iter().any(|a| a.eq_ignore_ascii_case(q))
+            {
+                return Some(page);
+            }
+        }
+        None
+    }
+
+    /// Search candidates for topic guidance: exact matches first, then substring matches.
+    pub fn find_candidates(&self, query: &str) -> Vec<&DocPage> {
+        let q = query.trim().to_lowercase();
+        if q.is_empty() {
+            return Vec::new();
+        }
+        if let Some(page) = self.lookup_exact(&q) {
+            return vec![page];
+        }
+        self.pages
+            .iter()
+            .filter(|page| {
+                page.id.to_lowercase().contains(&q)
+                    || page.title.to_lowercase().contains(&q)
+                    || page.aliases.iter().any(|a| a.to_lowercase().contains(&q))
+            })
+            .collect()
+    }
+
     pub fn lookup(&self, query: &str) -> Option<&DocPage> {
         let q = query.trim().to_lowercase();
 

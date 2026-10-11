@@ -65,12 +65,47 @@ impl DocEngine {
         self.index.lookup(query)
     }
 
+    /// Lookup page with exact match on id or alias.
+    pub fn lookup_exact(&self, query: &str) -> Option<&DocPage> {
+        self.index.lookup_exact(query)
+    }
+
     pub fn list_topics(&self, category: Option<&str>) -> Vec<TopicSummary> {
         self.index.list_topics(category)
     }
 
+    /// Return remediation hint command if the diagnostic code/rule exists.
+    pub fn hint(&self, code: &str) -> Option<String> {
+        self.index.lookup_exact(code).map(|page| {
+            format!(
+                "Help: run '{} {} {}'",
+                self.binary_name, self.explain_subcommand, page.id
+            )
+        })
+    }
+
+    /// Check a list of diagnostic error codes and return any codes that lack documentation.
+    pub fn missing_pages<I, S>(&self, codes: I) -> Vec<String>
+    where
+        I: IntoIterator<Item = S>,
+        S: AsRef<str>,
+    {
+        codes
+            .into_iter()
+            .filter_map(|c| {
+                let s = c.as_ref();
+                if self.index.lookup_exact(s).is_none() {
+                    Some(s.to_string())
+                } else {
+                    None
+                }
+            })
+            .collect()
+    }
+
+    /// Explain a diagnostic rule or specific topic by exact ID/alias lookup.
     pub fn explain(&self, query: &str, mode: RenderMode) -> Result<String, DocError> {
-        if let Some(page) = self.index.lookup(query) {
+        if let Some(page) = self.index.lookup_exact(query) {
             let renderer = DocRenderer::new(
                 &self.binary_name,
                 &self.guide_subcommand,
@@ -85,7 +120,32 @@ impl DocEngine {
 
     pub fn guide(&self, topic_opt: Option<&str>, mode: RenderMode) -> Result<String, DocError> {
         if let Some(topic) = topic_opt {
-            self.explain(topic, mode)
+            let candidates = self.index.find_candidates(topic);
+            if candidates.is_empty() {
+                Err(DocError::NotFound(topic.to_string()))
+            } else if candidates.len() == 1 {
+                let renderer = DocRenderer::new(
+                    &self.binary_name,
+                    &self.guide_subcommand,
+                    &self.explain_subcommand,
+                    &self.index,
+                );
+                Ok(renderer.render_page(candidates[0], mode))
+            } else {
+                let mut out = format!("Multiple topics matched '{}':\n\n", topic);
+                for c in candidates {
+                    let cmd = format!("{} {} {}", self.binary_name, self.guide_subcommand, c.id);
+                    if mode == RenderMode::Terminal {
+                        out.push_str(&format!(
+                            "  * \x1b[1m{}\x1b[0m: {} \x1b[90m(`{}`)\x1b[0m\n",
+                            c.id, c.summary, cmd
+                        ));
+                    } else {
+                        out.push_str(&format!("  * **{}**: {} (`{}`)\n", c.id, c.summary, cmd));
+                    }
+                }
+                Ok(out)
+            }
         } else {
             // Render index overview
             let mut out = String::new();
