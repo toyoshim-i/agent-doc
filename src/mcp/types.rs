@@ -39,7 +39,11 @@ pub struct ToolResult {
     pub content: Vec<ToolContent>,
     #[serde(skip_serializing_if = "Option::is_none", rename = "structuredContent")]
     pub structured_content: Option<serde_json::Value>,
-    #[serde(default, skip_serializing_if = "std::ops::Not::not", rename = "isError")]
+    #[serde(
+        default,
+        skip_serializing_if = "std::ops::Not::not",
+        rename = "isError"
+    )]
     pub is_error: bool,
 }
 

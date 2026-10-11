@@ -66,8 +66,8 @@ pub fn parse_markdown_page(path_str: &str, content: &str) -> DocPage {
     let mut first_h1 = None;
     for line in body_lines {
         let trimmed = line.trim();
-        if trimmed.starts_with("# ") {
-            first_h1 = Some(trimmed[2..].trim().to_string());
+        if let Some(rest) = trimmed.strip_prefix("# ") {
+            first_h1 = Some(rest.trim().to_string());
             break;
         }
     }
@@ -177,10 +177,10 @@ fn extract_sections(lines: &[&str]) -> Vec<DocSection> {
 
     for line in lines {
         let trimmed = line.trim();
-        let (level, heading_text) = if trimmed.starts_with("### ") {
-            (3, trimmed[4..].trim())
-        } else if trimmed.starts_with("## ") {
-            (2, trimmed[3..].trim())
+        let (level, heading_text) = if let Some(rest) = trimmed.strip_prefix("### ") {
+            (3, rest.trim())
+        } else if let Some(rest) = trimmed.strip_prefix("## ") {
+            (2, rest.trim())
         } else {
             (0, "")
         };

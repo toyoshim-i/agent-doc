@@ -71,10 +71,8 @@ fn handle_http_connection(engine: DocEngine, mut stream: TcpStream) -> io::Resul
                     "origin" => {
                         origin = Some(val.to_string());
                     }
-                    "connection" => {
-                        if val.eq_ignore_ascii_case("close") {
-                            connection_close = true;
-                        }
+                    "connection" if val.eq_ignore_ascii_case("close") => {
+                        connection_close = true;
                     }
                     _ => {}
                 }
@@ -83,7 +81,8 @@ fn handle_http_connection(engine: DocEngine, mut stream: TcpStream) -> io::Resul
 
         // Method verification
         if method != "POST" {
-            let resp = "HTTP/1.1 405 Method Not Allowed\r\nContent-Length: 0\r\nConnection: close\r\n\r\n";
+            let resp =
+                "HTTP/1.1 405 Method Not Allowed\r\nContent-Length: 0\r\nConnection: close\r\n\r\n";
             stream.write_all(resp.as_bytes())?;
             break;
         }
@@ -91,7 +90,8 @@ fn handle_http_connection(engine: DocEngine, mut stream: TcpStream) -> io::Resul
         // Local origin verification
         if let Some(ref o) = origin {
             if !is_local_origin(o) {
-                let resp = "HTTP/1.1 403 Forbidden\r\nContent-Length: 0\r\nConnection: close\r\n\r\n";
+                let resp =
+                    "HTTP/1.1 403 Forbidden\r\nContent-Length: 0\r\nConnection: close\r\n\r\n";
                 stream.write_all(resp.as_bytes())?;
                 break;
             }
@@ -109,7 +109,8 @@ fn handle_http_connection(engine: DocEngine, mut stream: TcpStream) -> io::Resul
 
         // Size cap verification
         if len > MAX_BODY_SIZE {
-            let resp = "HTTP/1.1 413 Payload Too Large\r\nContent-Length: 0\r\nConnection: close\r\n\r\n";
+            let resp =
+                "HTTP/1.1 413 Payload Too Large\r\nContent-Length: 0\r\nConnection: close\r\n\r\n";
             stream.write_all(resp.as_bytes())?;
             break;
         }
@@ -129,7 +130,11 @@ fn handle_http_connection(engine: DocEngine, mut stream: TcpStream) -> io::Resul
         match output {
             None => {
                 // Notification: return 204 No Content
-                let conn_header = if connection_close { "close" } else { "keep-alive" };
+                let conn_header = if connection_close {
+                    "close"
+                } else {
+                    "keep-alive"
+                };
                 let resp = format!(
                     "HTTP/1.1 204 No Content\r\nConnection: {}\r\n\r\n",
                     conn_header
@@ -138,7 +143,11 @@ fn handle_http_connection(engine: DocEngine, mut stream: TcpStream) -> io::Resul
             }
             Some(resp_json) => {
                 let bytes = resp_json.as_bytes();
-                let conn_header = if connection_close { "close" } else { "keep-alive" };
+                let conn_header = if connection_close {
+                    "close"
+                } else {
+                    "keep-alive"
+                };
                 let resp = format!(
                     "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: {}\r\n\r\n{}",
                     bytes.len(),
@@ -160,7 +169,10 @@ fn handle_http_connection(engine: DocEngine, mut stream: TcpStream) -> io::Resul
 
 /// Verify that origin is a trusted local address to prevent DNS rebinding attacks.
 pub fn is_local_origin(origin: &str) -> bool {
-    let without_proto = match origin.strip_prefix("http://").or_else(|| origin.strip_prefix("https://")) {
+    let without_proto = match origin
+        .strip_prefix("http://")
+        .or_else(|| origin.strip_prefix("https://"))
+    {
         Some(s) => s,
         None => return false,
     };

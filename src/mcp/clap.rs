@@ -3,11 +3,7 @@ use crate::mcp::types::{HandlerResult, ToolResult};
 use clap::{ArgAction, Command};
 use std::sync::Arc;
 
-pub fn tools_from_clap<F>(
-    cmd: Command,
-    exclude: &[&str],
-    handler: F,
-) -> Vec<Tool>
+pub fn tools_from_clap<F>(cmd: Command, exclude: &[&str], handler: F) -> Vec<Tool>
 where
     F: Fn(&str, clap::ArgMatches) -> HandlerResult<ToolResult> + Send + Sync + 'static,
 {
@@ -37,7 +33,8 @@ where
             let desc = arg.get_help().map(|h| h.to_string()).unwrap_or_default();
             let required = arg.is_required_set();
 
-            let param_type = if matches!(arg.get_action(), ArgAction::SetTrue | ArgAction::SetFalse) {
+            let param_type = if matches!(arg.get_action(), ArgAction::SetTrue | ArgAction::SetFalse)
+            {
                 ParamType::Boolean
             } else {
                 let possible: Vec<String> = arg
@@ -48,7 +45,7 @@ where
 
                 if !possible.is_empty() {
                     ParamType::Enum(possible)
-                } else if arg.get_num_args().map_or(false, |r| r.max_values() > 1)
+                } else if arg.get_num_args().is_some_and(|r| r.max_values() > 1)
                     || matches!(arg.get_action(), ArgAction::Append)
                 {
                     ParamType::StringArray

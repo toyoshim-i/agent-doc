@@ -85,7 +85,10 @@ Identity missing rule.
     assert_eq!(summary.trim(), expected_summary.trim());
 
     // 2. skill_md(name, description)
-    let skill = engine.skill_md("kinema-pcb-design", "Design, modify, route, and verify printed circuit boards (PCBs) in KiCad using kinema.");
+    let skill = engine.skill_md(
+        "kinema-pcb-design",
+        "Design, modify, route, and verify printed circuit boards (PCBs) in KiCad using kinema.",
+    );
     assert!(skill.contains("name: kinema-pcb-design"));
     assert!(skill.contains("kinema guide"));
     assert!(skill.contains("principles"));

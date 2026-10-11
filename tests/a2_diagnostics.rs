@@ -36,7 +36,10 @@ Separate nets.
     assert_eq!(hint1, Some("Help: run 'kinema explain E001'".to_string()));
 
     let hint_alias = engine.hint("unused-pin");
-    assert_eq!(hint_alias, Some("Help: run 'kinema explain E001'".to_string()));
+    assert_eq!(
+        hint_alias,
+        Some("Help: run 'kinema explain E001'".to_string())
+    );
 
     // Missing code returns None
     assert_eq!(engine.hint("E999"), None);

@@ -35,18 +35,12 @@ fn test_b4_clap_tools_acceptance() {
         .subcommand(Command::new("explain").about("Internal explain command - should be excluded"));
 
     // Register clap subcommands excluding guide and explain
-    engine.register_clap_tools(
-        cli,
-        &["guide", "explain"],
-        |subcmd, matches| {
-            let schem: &String = matches.get_one("schematic").unwrap();
-            let strict = matches.get_flag("strict");
-            agent_doc::mcp::ToolResult::text(format!(
-                "Ran {subcmd} on {schem} (strict: {strict})"
-            ))
+    engine.register_clap_tools(cli, &["guide", "explain"], |subcmd, matches| {
+        let schem: &String = matches.get_one("schematic").unwrap();
+        let strict = matches.get_flag("strict");
+        agent_doc::mcp::ToolResult::text(format!("Ran {subcmd} on {schem} (strict: {strict})"))
             .into()
-        },
-    );
+    });
 
     // 1. tools/list: "check" is registered, while "guide" and "explain" are excluded
     let tools = engine.mcp_list_tools();
@@ -55,8 +49,14 @@ fn test_b4_clap_tools_acceptance() {
     assert!(!tools.iter().any(|t| t.name == "explain"));
 
     let check_tool = tools.iter().find(|t| t.name == "check").unwrap();
-    assert_eq!(check_tool.input_schema["properties"]["schematic"]["type"], "string");
-    assert_eq!(check_tool.input_schema["properties"]["strict"]["type"], "boolean");
+    assert_eq!(
+        check_tool.input_schema["properties"]["schematic"]["type"],
+        "string"
+    );
+    assert_eq!(
+        check_tool.input_schema["properties"]["strict"]["type"],
+        "boolean"
+    );
     assert_eq!(
         check_tool.input_schema["properties"]["format"]["enum"],
         json!(["json", "text"])
@@ -73,7 +73,9 @@ fn test_b4_clap_tools_acceptance() {
         )
         .unwrap();
     assert!(!valid_call.is_error);
-    assert!(valid_call.content[0].text.contains("Ran check on board.v (strict: true)"));
+    assert!(valid_call.content[0]
+        .text
+        .contains("Ran check on board.v (strict: true)"));
 
     // 3. Acceptance condition: Clap parser rejects invalid input identically to CLI
     let invalid_call = engine
@@ -86,5 +88,7 @@ fn test_b4_clap_tools_acceptance() {
         )
         .unwrap();
     assert!(invalid_call.is_error);
-    assert!(invalid_call.content[0].text.contains("invalid value 'invalid_format'"));
+    assert!(invalid_call.content[0]
+        .text
+        .contains("invalid value 'invalid_format'"));
 }

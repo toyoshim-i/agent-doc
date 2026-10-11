@@ -23,8 +23,21 @@ Details.
     // Register a tool with builder
     let tool = Tool::builder("configure_pin", "Configure pin properties")
         .param("pin_id", ParamType::String, "Pin identifier", true)
-        .param("mode", ParamType::Enum(vec!["input".into(), "output".into()]), "Pin direction", true)
-        .param("pull", ParamType::Integer { min: Some(0), max: Some(2) }, "Pull mode (0: none, 1: up, 2: down)", false)
+        .param(
+            "mode",
+            ParamType::Enum(vec!["input".into(), "output".into()]),
+            "Pin direction",
+            true,
+        )
+        .param(
+            "pull",
+            ParamType::Integer {
+                min: Some(0),
+                max: Some(2),
+            },
+            "Pull mode (0: none, 1: up, 2: down)",
+            false,
+        )
         .param("tags", ParamType::StringArray, "Optional tags", false)
         .see("pin-count")
         .example(json!({
@@ -43,7 +56,9 @@ Details.
     // 1. tools/list schema generation
     let tools = engine.mcp_list_tools();
     let configured_pin_tool = tools.iter().find(|t| t.name == "configure_pin").unwrap();
-    assert!(configured_pin_tool.description.contains("Configure pin properties"));
+    assert!(configured_pin_tool
+        .description
+        .contains("Configure pin properties"));
     // Description references see page
     assert!(configured_pin_tool.description.contains("pin-count"));
     let schema = &configured_pin_tool.input_schema;
@@ -54,19 +69,33 @@ Details.
 
     // 2. Acceptance condition: valid args invocation succeeds
     let valid_call = engine
-        .mcp_call_tool("configure_pin", json!({ "pin_id": "P1", "mode": "input", "pull": 1 }))
+        .mcp_call_tool(
+            "configure_pin",
+            json!({ "pin_id": "P1", "mode": "input", "pull": 1 }),
+        )
         .unwrap();
     assert!(!valid_call.is_error);
     assert!(valid_call.content[0].text.contains("Configured pin P1"));
 
     // 3. Acceptance condition: validation error returns which arg failed and .see reference
     let invalid_call = engine
-        .mcp_call_tool("configure_pin", json!({ "pin_id": "P1", "mode": "invalid_mode" }))
+        .mcp_call_tool(
+            "configure_pin",
+            json!({ "pin_id": "P1", "mode": "invalid_mode" }),
+        )
         .unwrap();
     assert!(invalid_call.is_error, "Should fail validation");
     let err_msg = &invalid_call.content[0].text;
-    assert!(err_msg.contains("mode"), "Must specify which arg failed: {}", err_msg);
-    assert!(err_msg.contains("pin-count"), "Must point to .see page: {}", err_msg);
+    assert!(
+        err_msg.contains("mode"),
+        "Must specify which arg failed: {}",
+        err_msg
+    );
+    assert!(
+        err_msg.contains("pin-count"),
+        "Must point to .see page: {}",
+        err_msg
+    );
 
     // 4. Acceptance condition: check_tools detects broken .see references and invalid examples
     let tool_broken_see = Tool::builder("bad_tool", "Bad tool")

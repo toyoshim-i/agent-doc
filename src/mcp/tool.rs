@@ -5,10 +5,7 @@ use std::sync::Arc;
 #[derive(Debug, Clone, PartialEq)]
 pub enum ParamType {
     String,
-    Integer {
-        min: Option<i64>,
-        max: Option<i64>,
-    },
+    Integer { min: Option<i64>, max: Option<i64> },
     Number,
     Boolean,
     Enum(Vec<String>),
@@ -175,8 +172,8 @@ impl Tool {
                 ParamType::String => val.is_string(),
                 ParamType::Integer { min, max } => {
                     if let Some(i) = val.as_i64() {
-                        let min_ok = min.map_or(true, |m| i >= m);
-                        let max_ok = max.map_or(true, |m| i <= m);
+                        let min_ok = min.is_none_or(|m| i >= m);
+                        let max_ok = max.is_none_or(|m| i <= m);
                         min_ok && max_ok
                     } else {
                         false
@@ -216,8 +213,10 @@ impl Tool {
                     ParamType::Enum(variants) => format!("one of {:?}", variants),
                     ParamType::StringArray => "an array of strings".to_string(),
                 };
-                let mut err =
-                    format!("Invalid argument '{}': expected {expected}, got {val}.", p.name);
+                let mut err = format!(
+                    "Invalid argument '{}': expected {expected}, got {val}.",
+                    p.name
+                );
                 if let Some(ref see) = self.see_page {
                     err.push_str(&format!(" See {scheme}://doc/{see} for usage."));
                 }
@@ -299,9 +298,9 @@ impl ToolBuilder {
             see_page: self.see_page,
             examples: self.examples,
             skip_validation: self.skip_validation,
-            handler: self
-                .handler
-                .unwrap_or_else(|| Arc::new(|_| ToolResult::error("Handler not implemented").into())),
+            handler: self.handler.unwrap_or_else(|| {
+                Arc::new(|_| ToolResult::error("Handler not implemented").into())
+            }),
         }
     }
 }

@@ -3,10 +3,10 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum RenderMode {
     #[default]
-    Agent,     // Plain text with actionable CLI link hints, no ANSI escapes
-    Terminal,  // Formatted with ANSI styling and OSC 8 terminal hyperlinks
-    Json,      // Structured JSON output
-    Mcp,       // Plain text with MCP resource URIs and tool call hints
+    Agent, // Plain text with actionable CLI link hints, no ANSI escapes
+    Terminal, // Formatted with ANSI styling and OSC 8 terminal hyperlinks
+    Json,     // Structured JSON output
+    Mcp,      // Plain text with MCP resource URIs and tool call hints
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -95,7 +95,10 @@ impl CategoryConfig {
 
     pub fn matches(&self, category: &str) -> bool {
         self.key.eq_ignore_ascii_case(category)
-            || self.aliases.iter().any(|a| a.eq_ignore_ascii_case(category))
+            || self
+                .aliases
+                .iter()
+                .any(|a| a.eq_ignore_ascii_case(category))
     }
 }
 

@@ -24,14 +24,18 @@ category: guide
 # User Guide
 Welcome.
 "#,
-    ).unwrap();
+    )
+    .unwrap();
 
     // Run build embed helper with custom OUT_DIR
     std::env::set_var("OUT_DIR", &out_dir);
     agent_doc::build::embed(&docs_dir).unwrap();
 
     let output_file = out_dir.join("agent_doc_pages.rs");
-    assert!(output_file.exists(), "Embedded source file must be generated");
+    assert!(
+        output_file.exists(),
+        "Embedded source file must be generated"
+    );
 
     // In a real build.rs, the generated file produces a &[(&str, &str)] slice expression.
     // For this dynamic test, we verify the generated code content and also test adding a second file.
@@ -52,7 +56,8 @@ category: rule
 # E001
 Details of E001.
 "#,
-    ).unwrap();
+    )
+    .unwrap();
 
     // Re-run embed
     agent_doc::build::embed(&docs_dir).unwrap();

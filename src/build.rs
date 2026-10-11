@@ -10,8 +10,12 @@ pub const DEFAULT_EMBED_FILE: &str = "agent_doc_pages.rs";
 ///
 /// Emits `cargo:rerun-if-changed` for `dir` and all scanned markdown files.
 pub fn embed(dir: impl AsRef<Path>) -> io::Result<()> {
-    let out_dir = std::env::var("OUT_DIR")
-        .map_err(|e| Error::new(ErrorKind::NotFound, format!("OUT_DIR environment variable not found: {e}")))?;
+    let out_dir = std::env::var("OUT_DIR").map_err(|e| {
+        Error::new(
+            ErrorKind::NotFound,
+            format!("OUT_DIR environment variable not found: {e}"),
+        )
+    })?;
     embed_to(dir, Path::new(&out_dir).join(DEFAULT_EMBED_FILE))
 }
 

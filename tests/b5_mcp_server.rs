@@ -32,7 +32,8 @@ category: guide
         "id": 1,
         "method": "initialize",
         "params": {}
-    }).to_string();
+    })
+    .to_string();
 
     match engine.handle(&init_req) {
         HandlerResult::Ready(Some(res)) => {
@@ -47,10 +48,14 @@ category: guide
     let notif_req = json!({
         "jsonrpc": "2.0",
         "method": "notifications/initialized"
-    }).to_string();
+    })
+    .to_string();
     match engine.handle(&notif_req) {
         HandlerResult::Ready(None) => {}
-        other => panic!("Expected Ready(None) for notification, got {:?}", other.is_ready()),
+        other => panic!(
+            "Expected Ready(None) for notification, got {:?}",
+            other.is_ready()
+        ),
     }
 
     // Unknown method produces -32601
@@ -58,7 +63,8 @@ category: guide
         "jsonrpc": "2.0",
         "id": 2,
         "method": "unknown_method"
-    }).to_string();
+    })
+    .to_string();
     match engine.handle(&unknown_req) {
         HandlerResult::Ready(Some(res)) => {
             let v: serde_json::Value = serde_json::from_str(&res).unwrap();
@@ -90,7 +96,8 @@ category: guide
             "name": "hello",
             "arguments": {}
         }
-    }).to_string();
+    })
+    .to_string();
 
     let request = format!(
         "POST / HTTP/1.1\r\nHost: {}\r\nOrigin: http://localhost:{}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
@@ -139,7 +146,10 @@ category: guide
 
     let call_res: serde_json::Value = serde_json::from_str(lines[1]).unwrap();
     assert_eq!(call_res["id"], 101);
-    assert!(call_res["result"]["content"][0]["text"].as_str().unwrap().contains("world"));
+    assert!(call_res["result"]["content"][0]["text"]
+        .as_str()
+        .unwrap()
+        .contains("world"));
 }
 
 #[cfg(all(feature = "mcp", feature = "mcp-stdio", feature = "mcp-http"))]

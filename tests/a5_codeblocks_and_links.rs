@@ -47,15 +47,24 @@ Content here.
     assert_eq!(blocks.len(), 1);
     assert_eq!(blocks[0].page_id, "intro");
     assert_eq!(blocks[0].path, "docs/intro.md");
-    assert_eq!(blocks[0].line, 9, "Code block line must match line 9 in original file");
+    assert_eq!(
+        blocks[0].line, 9,
+        "Code block line must match line 9 in original file"
+    );
     assert_eq!(blocks[0].source.trim(), "module top;\nendmodule");
 
     // 2. Acceptance condition: broken_links detects broken relative links with correct line number
     // Line 14: Check out [Working Link](guide.md) and [Broken Link](nonexistent.md).
     let broken = engine.broken_links();
     let nonexistent = broken.iter().find(|b| b.target == "nonexistent.md");
-    assert!(nonexistent.is_some(), "nonexistent.md must be detected as broken");
+    assert!(
+        nonexistent.is_some(),
+        "nonexistent.md must be detected as broken"
+    );
     let nb = nonexistent.unwrap();
     assert_eq!(nb.page_id, "intro");
-    assert_eq!(nb.line, 14, "Broken link line must match line 14 in original file");
+    assert_eq!(
+        nb.line, 14,
+        "Broken link line must match line 14 in original file"
+    );
 }

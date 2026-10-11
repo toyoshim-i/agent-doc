@@ -41,14 +41,10 @@ impl DocIndex {
     /// Exact match on page id or aliases (case-insensitive).
     pub fn lookup_exact(&self, query: &str) -> Option<&DocPage> {
         let q = query.trim();
-        for page in &self.pages {
-            if page.id.eq_ignore_ascii_case(q)
+        self.pages.iter().find(|page| {
+            page.id.eq_ignore_ascii_case(q)
                 || page.aliases.iter().any(|a| a.eq_ignore_ascii_case(q))
-            {
-                return Some(page);
-            }
-        }
-        None
+        })
     }
 
     /// Search candidates for topic guidance: exact matches first, then substring matches.
@@ -85,16 +81,11 @@ impl DocIndex {
         }
 
         // 3. Prefix or contains match
-        for page in &self.pages {
-            if page.id.to_lowercase().contains(&q)
+        self.pages.iter().find(|page| {
+            page.id.to_lowercase().contains(&q)
                 || page.title.to_lowercase().contains(&q)
                 || page.aliases.iter().any(|a| a.to_lowercase().contains(&q))
-            {
-                return Some(page);
-            }
-        }
-
-        None
+        })
     }
 
     pub fn resolve_link(&self, from_path: &str, target: &str) -> Option<ResolvedLink> {
@@ -123,7 +114,9 @@ impl DocIndex {
         }
 
         // Relative path resolution
-        let from_dir = Path::new(from_path).parent().unwrap_or_else(|| Path::new(""));
+        let from_dir = Path::new(from_path)
+            .parent()
+            .unwrap_or_else(|| Path::new(""));
         let resolved_path = normalize_path(&from_dir.join(path_part));
         let resolved_str = resolved_path.to_string_lossy().to_string();
 

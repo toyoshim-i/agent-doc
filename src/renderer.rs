@@ -75,7 +75,8 @@ impl<'a> DocRenderer<'a> {
             out.push_str(&format!("\x1b[3m{}\x1b[0m\n\n", page.summary));
         }
 
-        let body_rewritten = self.rewrite_links(&page.path, &page.raw_content, RenderMode::Terminal);
+        let body_rewritten =
+            self.rewrite_links(&page.path, &page.raw_content, RenderMode::Terminal);
         out.push_str(&body_rewritten);
         out.push('\n');
 
@@ -126,7 +127,8 @@ impl<'a> DocRenderer<'a> {
                             let target: String = chars[start_target..tend].iter().collect();
 
                             let resolved = self.index.resolve_link(current_path, &target);
-                            let rendered_link = self.format_link(&label, &target, resolved.as_ref(), mode);
+                            let rendered_link =
+                                self.format_link(&label, &target, resolved.as_ref(), mode);
                             result.push_str(&rendered_link);
 
                             i = tend + 1;
@@ -154,13 +156,17 @@ impl<'a> DocRenderer<'a> {
             RenderMode::Agent => {
                 if let Some(res) = resolved {
                     let cmd = if res.category == "rule" {
-                        format!("{} {} {}", self.binary_name, self.explain_subcommand, res.target_id)
+                        format!(
+                            "{} {} {}",
+                            self.binary_name, self.explain_subcommand, res.target_id
+                        )
                     } else {
-                        format!("{} {} {}", self.binary_name, self.guide_subcommand, res.target_id)
+                        format!(
+                            "{} {} {}",
+                            self.binary_name, self.guide_subcommand, res.target_id
+                        )
                     };
                     format!("{} (see: '{}')", label, cmd)
-                } else if raw_target.starts_with("http://") || raw_target.starts_with("https://") {
-                    format!("{} ({})", label, raw_target)
                 } else {
                     format!("{} ({})", label, raw_target)
                 }
@@ -169,14 +175,26 @@ impl<'a> DocRenderer<'a> {
                 // OSC 8 terminal hyperlink
                 if let Some(res) = resolved {
                     let cmd_hint = if res.category == "rule" {
-                        format!("{} {} {}", self.binary_name, self.explain_subcommand, res.target_id)
+                        format!(
+                            "{} {} {}",
+                            self.binary_name, self.explain_subcommand, res.target_id
+                        )
                     } else {
-                        format!("{} {} {}", self.binary_name, self.guide_subcommand, res.target_id)
+                        format!(
+                            "{} {} {}",
+                            self.binary_name, self.guide_subcommand, res.target_id
+                        )
                     };
-                    format!("\x1b[4;34m{}\x1b[0m \x1b[90m(run '{}')\x1b[0m", label, cmd_hint)
+                    format!(
+                        "\x1b[4;34m{}\x1b[0m \x1b[90m(run '{}')\x1b[0m",
+                        label, cmd_hint
+                    )
                 } else if raw_target.starts_with("http://") || raw_target.starts_with("https://") {
                     // Standard OSC 8 hyperlink: \x1b]8;;URL\x1b\LABEL\x1b]8;;\x1b\
-                    format!("\x1b]8;;{}\x1b\\\x1b[4;34m{}\x1b[0m\x1b]8;;\x1b\\", raw_target, label)
+                    format!(
+                        "\x1b]8;;{}\x1b\\\x1b[4;34m{}\x1b[0m\x1b]8;;\x1b\\",
+                        raw_target, label
+                    )
                 } else {
                     format!("\x1b[4m{}\x1b[0m ({})", label, raw_target)
                 }
@@ -195,8 +213,6 @@ impl<'a> DocRenderer<'a> {
                             label, self.scheme, res.target_id, res.target_id
                         )
                     }
-                } else if raw_target.starts_with("http://") || raw_target.starts_with("https://") {
-                    format!("{} ({})", label, raw_target)
                 } else {
                     format!("{} ({})", label, raw_target)
                 }

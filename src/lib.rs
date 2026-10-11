@@ -298,11 +298,7 @@ impl DocEngine {
             if !cat_pages.is_empty() {
                 out.push_str(&format!("# {}\n", cat.heading));
                 for p in cat_pages {
-                    let label = if cat.use_id_as_title {
-                        &p.id
-                    } else {
-                        &p.title
-                    };
+                    let label = if cat.use_id_as_title { &p.id } else { &p.title };
                     out.push_str(&format!("- [{}]({})\n", label, clean_doc_path(&p.path)));
                 }
                 out.push('\n');
@@ -485,8 +481,7 @@ impl DocEngine {
 
                                 if let Some(tend) = target_end {
                                     let label: String = chars[start_label..lend].iter().collect();
-                                    let target: String =
-                                        chars[start_target..tend].iter().collect();
+                                    let target: String = chars[start_target..tend].iter().collect();
 
                                     // Skip external URLs
                                     if !target.starts_with("http://")
@@ -637,11 +632,9 @@ impl DocEngine {
                 };
 
                 if let Some(section) = args.get("section").and_then(|v| v.as_str()) {
-                    if let Some(sec) = page
-                        .sections
-                        .iter()
-                        .find(|s| s.anchor == section || crate::parser::slugify(&s.heading) == section)
-                    {
+                    if let Some(sec) = page.sections.iter().find(|s| {
+                        s.anchor == section || crate::parser::slugify(&s.heading) == section
+                    }) {
                         mcp::HandlerResult::Ready(mcp::ToolResult::text(format!(
                             "## {}\n\n{}",
                             sec.heading, sec.content
@@ -749,7 +742,10 @@ impl DocEngine {
     #[cfg(all(feature = "mcp", feature = "clap"))]
     pub fn register_clap_tools<F>(&mut self, cmd: ::clap::Command, exclude: &[&str], handler: F)
     where
-        F: Fn(&str, ::clap::ArgMatches) -> mcp::HandlerResult<mcp::ToolResult> + Send + Sync + 'static,
+        F: Fn(&str, ::clap::ArgMatches) -> mcp::HandlerResult<mcp::ToolResult>
+            + Send
+            + Sync
+            + 'static,
     {
         let tools = mcp::clap::tools_from_clap(cmd, exclude, handler);
         for tool in tools {
@@ -771,7 +767,9 @@ impl DocEngine {
             },
             mcp::McpToolDefinition {
                 name: "doc_read".to_string(),
-                description: "Read documentation page by ID or extract a specific section by anchor".to_string(),
+                description:
+                    "Read documentation page by ID or extract a specific section by anchor"
+                        .to_string(),
                 input_schema: serde_json::json!({
                     "type": "object",
                     "properties": {
@@ -825,10 +823,7 @@ fn clean_doc_path(path: &str) -> &str {
 }
 
 /// Compare content against an on-disk file, or update it when `AGENT_DOC_BLESS=1` or `AGENT_DOC_BLESS=true`.
-pub fn assert_or_bless(
-    file_path: impl AsRef<std::path::Path>,
-    actual: &str,
-) -> Result<(), String> {
+pub fn assert_or_bless(file_path: impl AsRef<std::path::Path>, actual: &str) -> Result<(), String> {
     let path = file_path.as_ref();
     let bless = std::env::var("AGENT_DOC_BLESS")
         .map(|v| v == "1" || v.eq_ignore_ascii_case("true"))
@@ -938,7 +933,8 @@ summary: How to migrate an existing KiCad project safely.
             .expect("render guide");
 
         assert!(
-            rendered_guide.contains("Rule: identity-missing (see: 'kinema explain identity-missing')"),
+            rendered_guide
+                .contains("Rule: identity-missing (see: 'kinema explain identity-missing')"),
             "Rule link must be rewritten to executable explain command: {}",
             rendered_guide
         );
@@ -947,10 +943,15 @@ summary: How to migrate an existing KiCad project safely.
         let rendered_term = engine
             .explain("identity-missing", RenderMode::Terminal)
             .expect("render terminal");
-        assert!(rendered_term.contains("\x1b]8;;https://docs.kicad.org\x1b\\"), "OSC 8 link expected for external URL");
+        assert!(
+            rendered_term.contains("\x1b]8;;https://docs.kicad.org\x1b\\"),
+            "OSC 8 link expected for external URL"
+        );
 
         // Test overview listing
-        let overview = engine.guide(None, RenderMode::Agent).expect("render overview");
+        let overview = engine
+            .guide(None, RenderMode::Agent)
+            .expect("render overview");
         assert!(overview.contains("## Getting Started & Migration"));
         assert!(overview.contains("## Guides & Best Practices"));
         assert!(overview.contains("## Diagnostics & Rules"));

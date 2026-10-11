@@ -48,25 +48,38 @@ Details for rule two.
     assert!(list_text.contains("Core Design Principles"));
 
     // 4. Built-in tool: doc_read (whole page)
-    let doc_read_all = engine.mcp_call_tool("doc_read", json!({ "id": "principles" })).unwrap();
+    let doc_read_all = engine
+        .mcp_call_tool("doc_read", json!({ "id": "principles" }))
+        .unwrap();
     assert!(!doc_read_all.is_error);
     assert!(doc_read_all.content[0].text.contains("Rule One"));
     assert!(doc_read_all.content[0].text.contains("Rule Two"));
 
     // 5. Built-in tool: doc_read (single section by anchor)
     let doc_read_section = engine
-        .mcp_call_tool("doc_read", json!({ "id": "principles", "section": "rule-one" }))
+        .mcp_call_tool(
+            "doc_read",
+            json!({ "id": "principles", "section": "rule-one" }),
+        )
         .unwrap();
     assert!(!doc_read_section.is_error);
     assert!(doc_read_section.content[0].text.contains("Rule One"));
-    assert!(!doc_read_section.content[0].text.contains("Rule Two"), "Should only return requested section");
+    assert!(
+        !doc_read_section.content[0].text.contains("Rule Two"),
+        "Should only return requested section"
+    );
 
     // 6. Built-in tool: doc_read with missing id or missing section returns isError
-    let missing_id = engine.mcp_call_tool("doc_read", json!({ "id": "nonexistent" })).unwrap();
+    let missing_id = engine
+        .mcp_call_tool("doc_read", json!({ "id": "nonexistent" }))
+        .unwrap();
     assert!(missing_id.is_error);
 
     let missing_section = engine
-        .mcp_call_tool("doc_read", json!({ "id": "principles", "section": "no-such-section" }))
+        .mcp_call_tool(
+            "doc_read",
+            json!({ "id": "principles", "section": "no-such-section" }),
+        )
         .unwrap();
     assert!(missing_section.is_error);
 }
