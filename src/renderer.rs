@@ -6,6 +6,7 @@ pub struct DocRenderer<'a> {
     pub guide_subcommand: &'a str,
     pub explain_subcommand: &'a str,
     pub index: &'a DocIndex,
+    pub scheme: &'a str,
 }
 
 impl<'a> DocRenderer<'a> {
@@ -20,7 +21,13 @@ impl<'a> DocRenderer<'a> {
             guide_subcommand,
             explain_subcommand,
             index,
+            scheme: binary_name,
         }
+    }
+
+    pub fn with_scheme(mut self, scheme: &'a str) -> Self {
+        self.scheme = scheme;
+        self
     }
 
     pub fn render_page(&self, page: &DocPage, mode: RenderMode) -> String {
@@ -28,6 +35,7 @@ impl<'a> DocRenderer<'a> {
             RenderMode::Json => serde_json::to_string_pretty(page).unwrap_or_default(),
             RenderMode::Agent => self.render_agent(page),
             RenderMode::Terminal => self.render_terminal(page),
+            RenderMode::Mcp => self.render_mcp(page),
         }
     }
 
@@ -39,6 +47,20 @@ impl<'a> DocRenderer<'a> {
         }
 
         let body_rewritten = self.rewrite_links(&page.path, &page.raw_content, RenderMode::Agent);
+        out.push_str(&body_rewritten);
+        out.push('\n');
+
+        out
+    }
+
+    fn render_mcp(&self, page: &DocPage) -> String {
+        let mut out = String::new();
+        out.push_str(&format!("# {}\n\n", page.title));
+        if !page.summary.is_empty() {
+            out.push_str(&format!("{}\n\n", page.summary));
+        }
+
+        let body_rewritten = self.rewrite_links(&page.path, &page.raw_content, RenderMode::Mcp);
         out.push_str(&body_rewritten);
         out.push('\n');
 
@@ -160,6 +182,25 @@ impl<'a> DocRenderer<'a> {
                 }
             }
             RenderMode::Json => format!("[{}]({})", label, raw_target),
+            RenderMode::Mcp => {
+                if let Some(res) = resolved {
+                    if let Some(ref anchor) = res.anchor {
+                        format!(
+                            "{} (resource: '{}://doc/{}#{}', tool: 'doc_read {{\"id\": \"{}\", \"section\": \"{}\"}}')",
+                            label, self.scheme, res.target_id, anchor, res.target_id, anchor
+                        )
+                    } else {
+                        format!(
+                            "{} (resource: '{}://doc/{}', tool: 'doc_read {{\"id\": \"{}\"}}')",
+                            label, self.scheme, res.target_id, res.target_id
+                        )
+                    }
+                } else if raw_target.starts_with("http://") || raw_target.starts_with("https://") {
+                    format!("{} ({})", label, raw_target)
+                } else {
+                    format!("{} ({})", label, raw_target)
+                }
+            }
         }
     }
 }

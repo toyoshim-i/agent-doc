@@ -25,14 +25,17 @@ pub struct DocEngine {
     pub binary_name: String,
     pub guide_subcommand: String,
     pub explain_subcommand: String,
+    pub scheme: String,
     pub index: DocIndex,
     pub categories: Vec<CategoryConfig>,
 }
 
 impl DocEngine {
     pub fn new(binary_name: impl Into<String>) -> Self {
+        let b = binary_name.into();
         Self {
-            binary_name: binary_name.into(),
+            scheme: b.clone(),
+            binary_name: b,
             guide_subcommand: "guide".to_string(),
             explain_subcommand: "explain".to_string(),
             index: DocIndex::new(),
@@ -48,6 +51,15 @@ impl DocEngine {
         self.guide_subcommand = guide_subcommand.into();
         self.explain_subcommand = explain_subcommand.into();
         self
+    }
+
+    pub fn with_scheme(mut self, scheme: impl Into<String>) -> Self {
+        self.scheme = scheme.into();
+        self
+    }
+
+    pub fn set_scheme(&mut self, scheme: impl Into<String>) {
+        self.scheme = scheme.into();
     }
 
     pub fn with_categories(mut self, categories: Vec<CategoryConfig>) -> Self {
@@ -125,7 +137,8 @@ impl DocEngine {
                 &self.guide_subcommand,
                 &self.explain_subcommand,
                 &self.index,
-            );
+            )
+            .with_scheme(&self.scheme);
             Ok(renderer.render_page(page, mode))
         } else {
             Err(DocError::NotFound(query.to_string()))
@@ -143,7 +156,8 @@ impl DocEngine {
                     &self.guide_subcommand,
                     &self.explain_subcommand,
                     &self.index,
-                );
+                )
+                .with_scheme(&self.scheme);
                 Ok(renderer.render_page(candidates[0], mode))
             } else {
                 let mut out = format!("Multiple topics matched '{}':\n\n", topic);

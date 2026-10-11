@@ -6,6 +6,7 @@ pub enum RenderMode {
     Agent,     // Plain text with actionable CLI link hints, no ANSI escapes
     Terminal,  // Formatted with ANSI styling and OSC 8 terminal hyperlinks
     Json,      // Structured JSON output
+    Mcp,       // Plain text with MCP resource URIs and tool call hints
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
