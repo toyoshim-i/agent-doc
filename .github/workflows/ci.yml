@@ -8,8 +8,17 @@ on:
 
 jobs:
   test:
-    name: Test agent-doc
+    name: Test Feature Combinations
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - name: "Default features"
+            flags: ""
+          - name: "MCP feature"
+            flags: "--no-default-features --features mcp"
+          - name: "All features"
+            flags: "--all-targets --features build,mcp,mcp-stdio,mcp-http,clap"
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -17,5 +26,20 @@ jobs:
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Run tests
-        run: cargo test --verbose
+      - name: Run tests (${{ matrix.name }})
+        run: cargo test ${{ matrix.flags }} --verbose
+
+  wasm:
+    name: Check wasm32 Target
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain with wasm32 target
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: Check wasm32 compilation
+        run: cargo check --target wasm32-unknown-unknown --no-default-features --features mcp --verbose
