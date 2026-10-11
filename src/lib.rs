@@ -7,7 +7,9 @@ pub mod renderer;
 pub mod build;
 
 pub use index::DocIndex;
-pub use model::{DocPage, DocSection, RenderMode, ResolvedLink, TopicSummary};
+pub use model::{
+    default_categories, CategoryConfig, DocPage, DocSection, RenderMode, ResolvedLink, TopicSummary,
+};
 pub use parser::parse_markdown_page;
 pub use renderer::DocRenderer;
 
@@ -23,6 +25,7 @@ pub struct DocEngine {
     pub guide_subcommand: String,
     pub explain_subcommand: String,
     pub index: DocIndex,
+    pub categories: Vec<CategoryConfig>,
 }
 
 impl DocEngine {
@@ -32,6 +35,7 @@ impl DocEngine {
             guide_subcommand: "guide".to_string(),
             explain_subcommand: "explain".to_string(),
             index: DocIndex::new(),
+            categories: default_categories(),
         }
     }
 
@@ -43,6 +47,15 @@ impl DocEngine {
         self.guide_subcommand = guide_subcommand.into();
         self.explain_subcommand = explain_subcommand.into();
         self
+    }
+
+    pub fn with_categories(mut self, categories: Vec<CategoryConfig>) -> Self {
+        self.categories = categories;
+        self
+    }
+
+    pub fn set_categories(&mut self, categories: Vec<CategoryConfig>) {
+        self.categories = categories;
     }
 
     pub fn add_page(&mut self, path: &str, content: &str) {
@@ -163,69 +176,239 @@ impl DocEngine {
                 ));
             }
 
-            let mut getting_started = Vec::new();
-            let mut guides = Vec::new();
-            let mut rules = Vec::new();
-            let mut others = Vec::new();
+            let mut matched_indices = std::collections::HashSet::new();
 
-            for t in topics {
-                match t.category.as_str() {
-                    "getting-started" | "start" | "migration" => getting_started.push(t),
-                    "guide" => guides.push(t),
-                    "rule" => rules.push(t),
-                    _ => others.push(t),
-                }
-            }
+            for cat in &self.categories {
+                let cat_topics: Vec<&TopicSummary> = topics
+                    .iter()
+                    .enumerate()
+                    .filter(|(idx, t)| {
+                        if cat.matches(&t.category) {
+                            matched_indices.insert(*idx);
+                            true
+                        } else {
+                            false
+                        }
+                    })
+                    .map(|(_, t)| t)
+                    .collect();
 
-            if !getting_started.is_empty() {
-                out.push_str("## Getting Started & Migration\n");
-                for s in getting_started {
-                    let cmd = format!("{} {} {}", self.binary_name, self.guide_subcommand, s.id);
-                    if mode == RenderMode::Terminal {
-                        out.push_str(&format!("  * \x1b[1;32m{}\x1b[0m: {} \x1b[90m(`{}`)\x1b[0m\n", s.id, s.summary, cmd));
-                    } else {
-                        out.push_str(&format!("  * **{}**: {} (`{}`)\n", s.id, s.summary, cmd));
+                if !cat_topics.is_empty() {
+                    out.push_str(&format!("## {}\n", cat.heading));
+                    for t in cat_topics {
+                        let subcmd = if cat.key == "rule" {
+                            &self.explain_subcommand
+                        } else {
+                            &self.guide_subcommand
+                        };
+                        let cmd = format!("{} {} {}", self.binary_name, subcmd, t.id);
+                        if mode == RenderMode::Terminal {
+                            out.push_str(&format!(
+                                "  * \x1b[1m{}\x1b[0m: {} \x1b[90m(`{}`)\x1b[0m\n",
+                                t.id, t.summary, cmd
+                            ));
+                        } else {
+                            out.push_str(&format!("  * **{}**: {} (`{}`)\n", t.id, t.summary, cmd));
+                        }
                     }
+                    out.push('\n');
                 }
-                out.push('\n');
             }
 
-            if !guides.is_empty() {
-                out.push_str("## Guides & Best Practices\n");
-                for g in guides {
-                    let cmd = format!("{} {} {}", self.binary_name, self.guide_subcommand, g.id);
-                    if mode == RenderMode::Terminal {
-                        out.push_str(&format!("  * \x1b[1m{}\x1b[0m: {} \x1b[90m(`{}`)\x1b[0m\n", g.id, g.summary, cmd));
-                    } else {
-                        out.push_str(&format!("  * **{}**: {} (`{}`)\n", g.id, g.summary, cmd));
-                    }
-                }
-                out.push('\n');
-            }
-
-            if !rules.is_empty() {
-                out.push_str("## Diagnostics & Rules\n");
-                for r in rules {
-                    let cmd = format!("{} {} {}", self.binary_name, self.explain_subcommand, r.id);
-                    if mode == RenderMode::Terminal {
-                        out.push_str(&format!("  * \x1b[1m{}\x1b[0m: {} \x1b[90m(`{}`)\x1b[0m\n", r.id, r.summary, cmd));
-                    } else {
-                        out.push_str(&format!("  * **{}**: {} (`{}`)\n", r.id, r.summary, cmd));
-                    }
-                }
-                out.push('\n');
-            }
+            let others: Vec<&TopicSummary> = topics
+                .iter()
+                .enumerate()
+                .filter(|(idx, _)| !matched_indices.contains(idx))
+                .map(|(_, t)| t)
+                .collect();
 
             if !others.is_empty() {
                 out.push_str("## Other Topics\n");
                 for o in others {
                     let cmd = format!("{} {} {}", self.binary_name, self.guide_subcommand, o.id);
-                    out.push_str(&format!("  * **{}**: {} (`{}`)\n", o.id, o.summary, cmd));
+                    if mode == RenderMode::Terminal {
+                        out.push_str(&format!(
+                            "  * \x1b[1m{}\x1b[0m: {} \x1b[90m(`{}`)\x1b[0m\n",
+                            o.id, o.summary, cmd
+                        ));
+                    } else {
+                        out.push_str(&format!("  * **{}**: {} (`{}`)\n", o.id, o.summary, cmd));
+                    }
                 }
                 out.push('\n');
             }
 
             Ok(out)
+        }
+    }
+
+    /// Generate mdBook `SUMMARY.md` from registered pages and category configuration.
+    pub fn summary_md(&self) -> String {
+        let mut out = String::from("# Summary\n\n");
+
+        let intro_page = self.index.pages.iter().find(|p| {
+            p.category.eq_ignore_ascii_case("intro")
+                || p.id.eq_ignore_ascii_case("readme")
+                || p.id.eq_ignore_ascii_case("introduction")
+        });
+
+        if let Some(intro) = intro_page {
+            out.push_str(&format!(
+                "[{}]({})\n\n",
+                intro.title,
+                clean_doc_path(&intro.path)
+            ));
+        }
+
+        for cat in &self.categories {
+            let cat_pages: Vec<&DocPage> = self
+                .index
+                .pages
+                .iter()
+                .filter(|p| {
+                    if Some(p.id.as_str()) == intro_page.map(|ip| ip.id.as_str()) {
+                        return false;
+                    }
+                    cat.matches(&p.category)
+                })
+                .collect();
+
+            if !cat_pages.is_empty() {
+                out.push_str(&format!("# {}\n", cat.heading));
+                for p in cat_pages {
+                    let label = if cat.use_id_as_title {
+                        &p.id
+                    } else {
+                        &p.title
+                    };
+                    out.push_str(&format!("- [{}]({})\n", label, clean_doc_path(&p.path)));
+                }
+                out.push('\n');
+            }
+        }
+
+        out
+    }
+
+    /// Generate Agent `SKILL.md` entrypoint.
+    pub fn skill_md(&self, name: &str, description: &str) -> String {
+        let mut out = String::new();
+        out.push_str("---\n");
+        out.push_str(&format!("name: {}\n", name));
+        out.push_str(&format!("description: {}\n", description));
+        out.push_str("---\n\n");
+
+        out.push_str(&format!("# {}\n\n", self.binary_name));
+        out.push_str(&format!(
+            "Run `{} {}` to browse available documentation and topics.\n\n",
+            self.binary_name, self.guide_subcommand
+        ));
+
+        out.push_str("## Available Topics\n\n");
+        for cat in &self.categories {
+            let cat_pages: Vec<&DocPage> = self
+                .index
+                .pages
+                .iter()
+                .filter(|p| cat.matches(&p.category))
+                .collect();
+
+            if !cat_pages.is_empty() {
+                out.push_str(&format!("### {}\n", cat.heading));
+                for p in cat_pages {
+                    let subcmd = if cat.key == "rule" {
+                        &self.explain_subcommand
+                    } else {
+                        &self.guide_subcommand
+                    };
+                    let cmd = format!("{} {} {}", self.binary_name, subcmd, p.id);
+                    out.push_str(&format!("- **{}**: {} (`{}`)\n", p.id, p.summary, cmd));
+                }
+                out.push('\n');
+            }
+        }
+
+        out
+    }
+
+    /// Generate `llms.txt` index.
+    pub fn llms_txt(&self) -> String {
+        let mut out = String::new();
+        out.push_str(&format!("# {}\n\n", self.binary_name));
+
+        for cat in &self.categories {
+            let cat_pages: Vec<&DocPage> = self
+                .index
+                .pages
+                .iter()
+                .filter(|p| cat.matches(&p.category))
+                .collect();
+
+            if !cat_pages.is_empty() {
+                out.push_str(&format!("## {}\n", cat.heading));
+                for p in cat_pages {
+                    out.push_str(&format!(
+                        "- [{}]({}): {}\n",
+                        p.title,
+                        clean_doc_path(&p.path),
+                        p.summary
+                    ));
+                }
+                out.push('\n');
+            }
+        }
+
+        out
+    }
+
+    /// Compare content against an on-disk file, or update it when `AGENT_DOC_BLESS=1`.
+    pub fn assert_or_bless(
+        &self,
+        file_path: impl AsRef<std::path::Path>,
+        actual: &str,
+    ) -> Result<(), String> {
+        assert_or_bless(file_path, actual)
+    }
+}
+
+/// Helper function to strip leading "docs/" prefix for mdBook relative paths.
+fn clean_doc_path(path: &str) -> &str {
+    path.strip_prefix("docs/").unwrap_or(path)
+}
+
+/// Compare content against an on-disk file, or update it when `AGENT_DOC_BLESS=1` or `AGENT_DOC_BLESS=true`.
+pub fn assert_or_bless(
+    file_path: impl AsRef<std::path::Path>,
+    actual: &str,
+) -> Result<(), String> {
+    let path = file_path.as_ref();
+    let bless = std::env::var("AGENT_DOC_BLESS")
+        .map(|v| v == "1" || v.eq_ignore_ascii_case("true"))
+        .unwrap_or(false);
+
+    if bless {
+        if let Some(parent) = path.parent() {
+            std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+        }
+        std::fs::write(path, actual).map_err(|e| e.to_string())?;
+        Ok(())
+    } else {
+        if !path.exists() {
+            return Err(format!(
+                "File does not exist: {}. Set AGENT_DOC_BLESS=1 to generate.",
+                path.display()
+            ));
+        }
+        let current = std::fs::read_to_string(path).map_err(|e| e.to_string())?;
+        if current.trim() == actual.trim() {
+            Ok(())
+        } else {
+            Err(format!(
+                "Content mismatch for {}:\n--- On disk:\n{}\n--- Generated:\n{}\nSet AGENT_DOC_BLESS=1 to update.",
+                path.display(),
+                current,
+                actual
+            ))
         }
     }
 }
