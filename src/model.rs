@@ -26,6 +26,7 @@ pub struct DocPage {
     pub aliases: Vec<String>,
     pub sections: Vec<DocSection>,
     pub raw_content: String,
+    pub source_content: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -34,6 +35,24 @@ pub struct ResolvedLink {
     pub category: String,
     pub anchor: Option<String>,
     pub label: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CodeBlock {
+    pub page_id: String,
+    pub path: String,
+    pub line: usize,
+    pub lang: String,
+    pub source: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct BrokenLink {
+    pub page_id: String,
+    pub path: String,
+    pub line: usize,
+    pub text: String,
+    pub target: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

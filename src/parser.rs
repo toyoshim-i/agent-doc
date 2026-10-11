@@ -97,6 +97,7 @@ pub fn parse_markdown_page(path_str: &str, content: &str) -> DocPage {
         aliases,
         sections,
         raw_content: body_text,
+        source_content: content.to_string(),
     }
 }
 

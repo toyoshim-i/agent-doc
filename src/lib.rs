@@ -8,7 +8,8 @@ pub mod build;
 
 pub use index::DocIndex;
 pub use model::{
-    default_categories, CategoryConfig, DocPage, DocSection, RenderMode, ResolvedLink, TopicSummary,
+    default_categories, BrokenLink, CategoryConfig, CodeBlock, DocPage, DocSection, RenderMode,
+    ResolvedLink, TopicSummary,
 };
 pub use parser::parse_markdown_page;
 pub use renderer::DocRenderer;
@@ -359,6 +360,163 @@ impl DocEngine {
         }
 
         out
+    }
+
+    /// Extract fenced code blocks for a given language tag across all registered documentation pages.
+    ///
+    /// The returned `line` is the 1-indexed line number in the original markdown file.
+    pub fn code_blocks(&self, lang: &str) -> Vec<CodeBlock> {
+        let mut blocks = Vec::new();
+        let lang_lower = lang.trim().to_lowercase();
+
+        for page in &self.index.pages {
+            let lines: Vec<&str> = page.source_content.lines().collect();
+            let mut in_fence = false;
+            let mut fence_lang = String::new();
+            let mut start_line = 0;
+            let mut current_block = String::new();
+
+            for (idx, line) in lines.iter().enumerate() {
+                let line_num = idx + 1;
+                let trimmed = line.trim();
+
+                if trimmed.starts_with("```") {
+                    if in_fence {
+                        // End of fence
+                        if lang_lower.is_empty() || fence_lang.to_lowercase() == lang_lower {
+                            blocks.push(CodeBlock {
+                                page_id: page.id.clone(),
+                                path: page.path.clone(),
+                                line: start_line,
+                                lang: fence_lang.clone(),
+                                source: current_block.clone(),
+                            });
+                        }
+                        in_fence = false;
+                        fence_lang.clear();
+                        current_block.clear();
+                    } else {
+                        // Start of fence
+                        in_fence = true;
+                        start_line = line_num;
+                        let info = trimmed.trim_start_matches('`').trim();
+                        fence_lang = info.split_whitespace().next().unwrap_or("").to_string();
+                    }
+                } else if in_fence {
+                    current_block.push_str(line);
+                    current_block.push('\n');
+                }
+            }
+        }
+        blocks
+    }
+
+    /// Scan all documentation pages for broken relative links and anchors.
+    ///
+    /// The returned `line` is the 1-indexed line number in the original markdown file.
+    pub fn broken_links(&self) -> Vec<BrokenLink> {
+        let mut broken = Vec::new();
+
+        for page in &self.index.pages {
+            let lines: Vec<&str> = page.source_content.lines().collect();
+            let mut in_fence = false;
+
+            for (idx, line) in lines.iter().enumerate() {
+                let line_num = idx + 1;
+                let trimmed = line.trim();
+                if trimmed.starts_with("```") {
+                    in_fence = !in_fence;
+                    continue;
+                }
+                if in_fence {
+                    continue;
+                }
+
+                let chars: Vec<char> = line.chars().collect();
+                let len = chars.len();
+                let mut i = 0;
+
+                while i < len {
+                    if chars[i] == '[' {
+                        let start_label = i + 1;
+                        let mut label_end = None;
+                        let mut j = start_label;
+                        while j < len {
+                            if chars[j] == ']' {
+                                label_end = Some(j);
+                                break;
+                            }
+                            j += 1;
+                        }
+
+                        if let Some(lend) = label_end {
+                            if lend + 1 < len && chars[lend + 1] == '(' {
+                                let start_target = lend + 2;
+                                let mut target_end = None;
+                                let mut k = start_target;
+                                while k < len {
+                                    if chars[k] == ')' {
+                                        target_end = Some(k);
+                                        break;
+                                    }
+                                    k += 1;
+                                }
+
+                                if let Some(tend) = target_end {
+                                    let label: String = chars[start_label..lend].iter().collect();
+                                    let target: String =
+                                        chars[start_target..tend].iter().collect();
+
+                                    // Skip external URLs
+                                    if !target.starts_with("http://")
+                                        && !target.starts_with("https://")
+                                        && !target.starts_with("mailto:")
+                                    {
+                                        let resolved = self.index.resolve_link(&page.path, &target);
+                                        let is_broken = match resolved {
+                                            None => true,
+                                            Some(ref res) => {
+                                                if let Some(ref anchor) = res.anchor {
+                                                    // Verify section anchor exists in target page
+                                                    if let Some(target_page) =
+                                                        self.index.lookup_exact(&res.target_id)
+                                                    {
+                                                        !target_page
+                                                            .sections
+                                                            .iter()
+                                                            .any(|s| s.anchor == *anchor)
+                                                    } else {
+                                                        true
+                                                    }
+                                                } else {
+                                                    false
+                                                }
+                                            }
+                                        };
+
+                                        if is_broken {
+                                            broken.push(BrokenLink {
+                                                page_id: page.id.clone(),
+                                                path: page.path.clone(),
+                                                line: line_num,
+                                                text: label,
+                                                target,
+                                            });
+                                        }
+                                    }
+
+                                    i = tend + 1;
+                                    continue;
+                                }
+                            }
+                        }
+                    }
+                    i += 1;
+                }
+            }
+        }
+
+        broken
     }
 
     /// Compare content against an on-disk file, or update it when `AGENT_DOC_BLESS=1`.
