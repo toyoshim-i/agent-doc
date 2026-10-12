@@ -5,10 +5,10 @@ pub mod types;
 #[cfg(feature = "clap")]
 pub mod clap;
 
-#[cfg(feature = "mcp-stdio")]
+#[cfg(all(feature = "mcp-stdio", not(target_arch = "wasm32")))]
 pub mod stdio;
 
-#[cfg(feature = "mcp-http")]
+#[cfg(all(feature = "mcp-http", not(target_arch = "wasm32")))]
 pub mod http;
 
 pub use protocol::handle_json_rpc;
@@ -17,5 +17,5 @@ pub use types::{
     HandlerResult, McpResource, McpResourceContents, PendingResult, ToolContent, ToolResult,
 };
 
-#[cfg(feature = "mcp-http")]
+#[cfg(all(feature = "mcp-http", not(target_arch = "wasm32")))]
 pub use http::HttpServer;

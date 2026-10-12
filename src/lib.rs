@@ -727,13 +727,13 @@ impl DocEngine {
     }
 
     /// Serve MCP JSON-RPC protocol over standard input/output.
-    #[cfg(feature = "mcp-stdio")]
+    #[cfg(all(feature = "mcp-stdio", not(target_arch = "wasm32")))]
     pub fn serve_stdio(&self) -> std::io::Result<()> {
         mcp::stdio::serve_stdio(self)
     }
 
     /// Serve MCP JSON-RPC protocol over custom reader and writer streams.
-    #[cfg(feature = "mcp-stdio")]
+    #[cfg(all(feature = "mcp-stdio", not(target_arch = "wasm32")))]
     pub fn serve_stdio_io<R: std::io::BufRead, W: std::io::Write>(
         &self,
         reader: R,
@@ -746,7 +746,7 @@ impl DocEngine {
     ///
     /// Binds directly to the provided address (it is the caller's responsibility
     /// to specify a loopback address if local-only access is desired).
-    #[cfg(feature = "mcp-http")]
+    #[cfg(all(feature = "mcp-http", not(target_arch = "wasm32")))]
     pub fn serve_http(
         &self,
         addr: impl std::net::ToSocketAddrs,

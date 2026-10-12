@@ -42,4 +42,4 @@ jobs:
           targets: wasm32-unknown-unknown
 
       - name: Check wasm32 compilation
-        run: cargo check --target wasm32-unknown-unknown --no-default-features --features mcp --verbose
+        run: cargo check --target wasm32-unknown-unknown --all-features --verbose
