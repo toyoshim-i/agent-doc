@@ -127,6 +127,7 @@ impl Tool {
             "type": "object",
             "properties": properties,
             "required": required_fields,
+            "additionalProperties": false,
         })
     }
 
@@ -153,6 +154,21 @@ impl Tool {
                 return Err(ToolResult::error(err));
             }
         };
+
+        let declared_names: Vec<&str> = self.params.iter().map(|p| p.name.as_str()).collect();
+        for key in obj.keys() {
+            if !declared_names.contains(&key.as_str()) {
+                let allowed = declared_names.join(", ");
+                let mut err = format!(
+                    "Unknown argument '{}'. Declared arguments: [{}].",
+                    key, allowed
+                );
+                if let Some(ref see) = self.see_page {
+                    err.push_str(&format!(" See {scheme}://doc/{see} for usage."));
+                }
+                return Err(ToolResult::error(err));
+            }
+        }
 
         for p in &self.params {
             let val = obj.get(&p.name);

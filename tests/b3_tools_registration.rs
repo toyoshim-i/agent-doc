@@ -63,6 +63,7 @@ Details.
     assert!(configured_pin_tool.description.contains("pin-count"));
     let schema = &configured_pin_tool.input_schema;
     assert_eq!(schema["type"], "object");
+    assert_eq!(schema["additionalProperties"], false);
     assert_eq!(schema["properties"]["pin_id"]["type"], "string");
     assert_eq!(schema["properties"]["pull"]["minimum"], 0);
     assert_eq!(schema["properties"]["pull"]["maximum"], 2);
@@ -76,6 +77,34 @@ Details.
         .unwrap();
     assert!(!valid_call.is_error);
     assert!(valid_call.content[0].text.contains("Configured pin P1"));
+
+    // 2b. Acceptance condition: misspelled/unknown optional argument is rejected
+    let unknown_arg_call = engine
+        .mcp_call_tool(
+            "configure_pin",
+            json!({ "pin_id": "P1", "mode": "input", "pulll": 1 }),
+        )
+        .unwrap();
+    assert!(
+        unknown_arg_call.is_error,
+        "Unknown/misspelled argument must be rejected with isError"
+    );
+    let unknown_err_msg = &unknown_arg_call.content[0].text;
+    assert!(
+        unknown_err_msg.contains("pulll"),
+        "Must specify unknown argument: {}",
+        unknown_err_msg
+    );
+    assert!(
+        unknown_err_msg.contains("pin_id") && unknown_err_msg.contains("pull"),
+        "Must list declared arguments: {}",
+        unknown_err_msg
+    );
+    assert!(
+        unknown_err_msg.contains("pin-count"),
+        "Must reference .see page: {}",
+        unknown_err_msg
+    );
 
     // 3. Acceptance condition: validation error returns which arg failed and .see reference
     let invalid_call = engine
