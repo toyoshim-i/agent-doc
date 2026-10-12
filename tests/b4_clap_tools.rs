@@ -40,18 +40,20 @@ fn test_b4_clap_tools_acceptance() {
         .subcommand(Command::new("explain").about("Internal explain command - should be excluded"));
 
     // Register clap subcommands excluding guide and explain
-    engine.register_clap_tools(cli, &["guide", "explain"], |subcmd, matches| {
-        let schem: &String = matches.get_one("schematic").unwrap();
-        let strict = matches.get_flag("strict");
-        let files: Vec<String> = matches
-            .get_many::<String>("files")
-            .map(|vals| vals.cloned().collect())
-            .unwrap_or_default();
-        agent_doc::mcp::ToolResult::text(format!(
-            "Ran {subcmd} on {schem} (strict: {strict}, files: {files:?})"
-        ))
-        .into()
-    });
+    engine
+        .register_clap_tools(cli, &["guide", "explain"], |subcmd, matches| {
+            let schem: &String = matches.get_one("schematic").unwrap();
+            let strict = matches.get_flag("strict");
+            let files: Vec<String> = matches
+                .get_many::<String>("files")
+                .map(|vals| vals.cloned().collect())
+                .unwrap_or_default();
+            agent_doc::mcp::ToolResult::text(format!(
+                "Ran {subcmd} on {schem} (strict: {strict}, files: {files:?})"
+            ))
+            .into()
+        })
+        .unwrap();
 
     // 1. tools/list: "check" is registered, while "guide" and "explain" are excluded
     let tools = engine.mcp_list_tools();

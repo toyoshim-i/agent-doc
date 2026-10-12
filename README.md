@@ -37,7 +37,7 @@ Dumping massive prompt files or skill definitions into LLM contexts causes promp
   - Verify freshness in tests or update with `DocEngine::assert_or_bless()`.
 - **First-Class MCP Integration**:
   - Expose documentation via `resources/list`, `resources/read`, and built-in `doc_list` / `doc_read` tools.
-  - Register custom tools with typed schemas (`ToolBuilder`) or directly from `clap::Command`.
+  - Register custom tools with typed schemas (`ToolBuilder`) or directly from `clap::Command` (`register_tool` returns `Result<(), DocError>`, rejecting duplicate tool names or collisions with reserved built-in `doc_list` and `doc_read`).
   - Run MCP servers via `serve_stdio()`, `serve_http(addr)`, or zero-I/O `handle(request)`.
   - Non-blocking async / pending execution model compatible with native threads and `wasm32-unknown-unknown` (WebMCP / Karakuri).
 - **Documentation Linting**:

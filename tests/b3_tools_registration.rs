@@ -51,7 +51,7 @@ Details.
         })
         .build();
 
-    engine.register_tool(tool);
+    engine.register_tool(tool).unwrap();
 
     // 1. tools/list schema generation
     let tools = engine.mcp_list_tools();
@@ -131,7 +131,7 @@ Details.
         .see("nonexistent-page-id")
         .handler(|_| agent_doc::mcp::ToolResult::text("ok").into())
         .build();
-    engine.register_tool(tool_broken_see);
+    engine.register_tool(tool_broken_see).unwrap();
 
     let issues = engine.check_tools();
     assert!(!issues.is_empty(), "Must detect nonexistent .see reference");
@@ -151,5 +151,24 @@ Details.
     assert_eq!(
         serialized["content"][0]["text"],
         "Refused due to rule violation"
+    );
+
+    // 6. Acceptance condition: registering 'doc_read' or a duplicate tool name is detected and rejected
+    let reserved_tool = Tool::builder("doc_read", "Reserved tool name")
+        .handler(|_| agent_doc::mcp::ToolResult::text("ok").into())
+        .build();
+    let res_reserved = engine.register_tool(reserved_tool);
+    assert!(
+        res_reserved.is_err(),
+        "Registering tool named 'doc_read' must be rejected"
+    );
+
+    let dup_tool = Tool::builder("configure_pin", "Duplicate tool name")
+        .handler(|_| agent_doc::mcp::ToolResult::text("ok").into())
+        .build();
+    let res_dup = engine.register_tool(dup_tool);
+    assert!(
+        res_dup.is_err(),
+        "Registering duplicate tool name 'configure_pin' must be rejected"
     );
 }

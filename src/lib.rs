@@ -17,10 +17,14 @@ pub use model::{
 pub use parser::parse_markdown_page;
 pub use renderer::DocRenderer;
 
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug, thiserror::Error, PartialEq, Eq)]
 pub enum DocError {
     #[error("Topic '{0}' not found in documentation index")]
     NotFound(String),
+    #[error("Tool '{0}' conflicts with reserved built-in tool name")]
+    ReservedTool(String),
+    #[error("Tool '{0}' is already registered")]
+    DuplicateTool(String),
 }
 
 #[derive(Debug, Clone)]
@@ -748,21 +752,34 @@ impl DocEngine {
     }
 
     /// Register a custom tool for MCP execution.
+    /// Returns Err if the tool name is reserved ("doc_list", "doc_read") or already registered.
     #[cfg(feature = "mcp")]
-    pub fn register_tool(&mut self, tool: mcp::Tool) {
+    pub fn register_tool(&mut self, tool: mcp::Tool) -> Result<(), DocError> {
+        if tool.name == "doc_list" || tool.name == "doc_read" {
+            return Err(DocError::ReservedTool(tool.name));
+        }
+        if self.tools.iter().any(|t| t.name == tool.name) {
+            return Err(DocError::DuplicateTool(tool.name));
+        }
         self.tools.push(tool);
+        Ok(())
     }
 
     /// Builder helper to attach a tool.
     #[cfg(feature = "mcp")]
-    pub fn with_tool(mut self, tool: mcp::Tool) -> Self {
-        self.tools.push(tool);
-        self
+    pub fn with_tool(mut self, tool: mcp::Tool) -> Result<Self, DocError> {
+        self.register_tool(tool)?;
+        Ok(self)
     }
 
     /// Register clap subcommands as MCP tools, parsing inputs through clap's parser.
     #[cfg(all(feature = "mcp", feature = "clap"))]
-    pub fn register_clap_tools<F>(&mut self, cmd: ::clap::Command, exclude: &[&str], handler: F)
+    pub fn register_clap_tools<F>(
+        &mut self,
+        cmd: ::clap::Command,
+        exclude: &[&str],
+        handler: F,
+    ) -> Result<(), DocError>
     where
         F: Fn(&str, ::clap::ArgMatches) -> mcp::HandlerResult<mcp::ToolResult>
             + Send
@@ -771,8 +788,9 @@ impl DocEngine {
     {
         let tools = mcp::clap::tools_from_clap(cmd, exclude, handler);
         for tool in tools {
-            self.register_tool(tool);
+            self.register_tool(tool)?;
         }
+        Ok(())
     }
 
     /// List all available MCP tools including built-in doc tools and registered host tools.
@@ -813,10 +831,23 @@ impl DocEngine {
     /// Verify tool definitions for consistency:
     /// - Checks that all `.see` references point to existing documentation page IDs.
     /// - Checks that all `.example` payloads pass argument schema validation.
+    /// - Checks that tool names do not conflict with reserved built-in tools or duplicate other tools.
     #[cfg(feature = "mcp")]
     pub fn check_tools(&self) -> Vec<String> {
         let mut issues = Vec::new();
+        let mut seen = std::collections::HashSet::new();
+
         for tool in &self.tools {
+            if tool.name == "doc_list" || tool.name == "doc_read" {
+                issues.push(format!(
+                    "Tool '{}' conflicts with reserved built-in tool name",
+                    tool.name
+                ));
+            }
+            if !seen.insert(&tool.name) {
+                issues.push(format!("Duplicate tool registration for '{}'", tool.name));
+            }
+
             if let Some(ref see) = tool.see_page {
                 if self.index.lookup_exact(see).is_none() {
                     issues.push(format!(

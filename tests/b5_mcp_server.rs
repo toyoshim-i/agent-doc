@@ -24,7 +24,7 @@ category: guide
     let hello_tool = Tool::builder("hello", "Say hello")
         .handler(|_| ToolResult::text("world").into())
         .build();
-    engine.register_tool(hello_tool);
+    engine.register_tool(hello_tool).unwrap();
 
     // 1. Direct invocation via handle(): initialize, ping, tools/list, tools/call
     let init_req = json!({
@@ -284,7 +284,7 @@ category: guide
 
     // Verify it compiles, registers, and dispatches
     let mut async_engine = DocEngine::new("test");
-    async_engine.register_tool(async_tool);
+    async_engine.register_tool(async_tool).unwrap();
 
     let rpc_call = json!({
         "jsonrpc": "2.0",
