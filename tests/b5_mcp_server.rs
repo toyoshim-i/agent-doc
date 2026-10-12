@@ -317,3 +317,123 @@ impl<T> IsReadyHelper for agent_man::mcp::HandlerResult<T> {
         matches!(self, agent_man::mcp::HandlerResult::Ready(_))
     }
 }
+
+#[cfg(all(feature = "mcp-http", not(target_arch = "wasm32")))]
+#[test]
+fn test_http_delayed_request_50ms() {
+    use agent_man::DocEngine;
+    use serde_json::json;
+    use std::io::{BufRead, Write};
+    use std::net::TcpStream;
+    use std::time::Duration;
+
+    let engine = DocEngine::new("kinema");
+    let server = engine.serve_http("127.0.0.1:0").unwrap();
+    let addr = server.local_addr();
+
+    // 1. Connect, wait 50ms before sending request, expect 200 OK
+    let mut stream = TcpStream::connect(addr).unwrap();
+    std::thread::sleep(Duration::from_millis(50));
+    let body = json!({
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "ping"
+    })
+    .to_string();
+    let req = format!(
+        "POST / HTTP/1.1\r\nHost: {}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+        addr,
+        body.len(),
+        body
+    );
+    stream.write_all(req.as_bytes()).unwrap();
+
+    let mut reader = std::io::BufReader::new(stream);
+    let mut status_line = String::new();
+    reader.read_line(&mut status_line).unwrap();
+    assert!(
+        status_line.contains("200 OK"),
+        "Expected 200 OK after 50ms delay, got: {}",
+        status_line
+    );
+}
+
+#[cfg(all(feature = "mcp-http", not(target_arch = "wasm32")))]
+#[test]
+fn test_http_sequential_request_200ms() {
+    use agent_man::DocEngine;
+    use serde_json::json;
+    use std::io::{BufRead, Read, Write};
+    use std::net::TcpStream;
+    use std::time::Duration;
+
+    let engine = DocEngine::new("kinema");
+    let server = engine.serve_http("127.0.0.1:0").unwrap();
+    let addr = server.local_addr();
+
+    // 2. Same connection: send request 1, wait 200ms, send request 2, expect 200 OK
+    let mut stream = TcpStream::connect(addr).unwrap();
+    let body1 = json!({
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "ping"
+    })
+    .to_string();
+    let req1 = format!(
+        "POST / HTTP/1.1\r\nHost: {}\r\nContent-Length: {}\r\nConnection: keep-alive\r\n\r\n{}",
+        addr,
+        body1.len(),
+        body1
+    );
+    stream.write_all(req1.as_bytes()).unwrap();
+
+    let mut reader = std::io::BufReader::new(stream.try_clone().unwrap());
+    let mut status1 = String::new();
+    reader.read_line(&mut status1).unwrap();
+    assert!(
+        status1.contains("200 OK"),
+        "Request 1 expected 200 OK, got: {}",
+        status1
+    );
+
+    // Consume headers and body of response 1
+    let mut content_len = 0;
+    loop {
+        let mut line = String::new();
+        reader.read_line(&mut line).unwrap();
+        if line.trim().is_empty() {
+            break;
+        }
+        if let Some(val) = line.to_lowercase().strip_prefix("content-length:") {
+            content_len = val.trim().parse().unwrap_or(0);
+        }
+    }
+    let mut body_buf = vec![0u8; content_len];
+    reader.read_exact(&mut body_buf).unwrap();
+
+    // Wait 200ms
+    std::thread::sleep(Duration::from_millis(200));
+
+    // Send request 2
+    let body2 = json!({
+        "jsonrpc": "2.0",
+        "id": 2,
+        "method": "ping"
+    })
+    .to_string();
+    let req2 = format!(
+        "POST / HTTP/1.1\r\nHost: {}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+        addr,
+        body2.len(),
+        body2
+    );
+    stream.write_all(req2.as_bytes()).unwrap();
+
+    let mut status2 = String::new();
+    reader.read_line(&mut status2).unwrap();
+    assert!(
+        status2.contains("200 OK"),
+        "Request 2 expected 200 OK after 200ms gap, got: {}",
+        status2
+    );
+}

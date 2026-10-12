@@ -64,6 +64,7 @@ pub fn serve_http(engine: &DocEngine, addr: impl ToSocketAddrs) -> io::Result<Ht
             while !shutdown_thread.load(Ordering::Relaxed) {
                 match listener.accept() {
                     Ok((stream, _)) => {
+                        let _ = stream.set_nonblocking(false);
                         let eng = engine_clone.clone();
                         std::thread::spawn(move || {
                             let _ = handle_http_connection(eng, stream);
@@ -114,7 +115,7 @@ fn handle_http_connection(engine: DocEngine, stream: TcpStream) -> io::Result<()
         match read_capped(&mut reader, &mut request_line, MAX_HEADER_LINE) {
             Ok(0) => break, // EOF: client hung up
             Ok(_) => {}
-            Err(_) => {
+            Err(ref e) if e.kind() == io::ErrorKind::InvalidData => {
                 let _ = respond(
                     &mut writer,
                     400,
@@ -122,6 +123,10 @@ fn handle_http_connection(engine: DocEngine, stream: TcpStream) -> io::Result<()
                     b"request line too long",
                     true,
                 );
+                break;
+            }
+            Err(_) => {
+                // Connection timed out (TimedOut / WouldBlock) or other I/O error: close without responding
                 break;
             }
         }

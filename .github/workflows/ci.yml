@@ -8,17 +8,18 @@ on:
 
 jobs:
   test:
-    name: Test Feature Combinations
-    runs-on: ubuntu-latest
+    name: Test (${{ matrix.os }}, ${{ matrix.feature.name }})
+    runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        include:
+        os: [ubuntu-latest, macos-latest]
+        feature:
           - name: "Default features"
             flags: ""
           - name: "MCP feature"
             flags: "--no-default-features --features mcp"
           - name: "All features"
-            flags: "--all-targets --features build,mcp,mcp-stdio,mcp-http,clap"
+            flags: "--all-targets --all-features"
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -26,8 +27,8 @@ jobs:
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Run tests (${{ matrix.name }})
-        run: cargo test ${{ matrix.flags }} --verbose
+      - name: Run tests (${{ matrix.feature.name }})
+        run: cargo test ${{ matrix.feature.flags }} --verbose
 
   wasm:
     name: Check wasm32 Target
