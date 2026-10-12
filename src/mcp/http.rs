@@ -45,8 +45,11 @@ impl Drop for HttpServer {
     }
 }
 
-/// Run HTTP MCP server bound to the specified loopback socket address.
-/// Returns an `HttpServer` handle immediately without blocking the caller.
+/// Run HTTP MCP server bound to the specified socket address.
+///
+/// Binds directly to the provided address (it is the caller's responsibility to
+/// specify a loopback address if local-only access is desired). Returns an
+/// `HttpServer` handle immediately without blocking the caller.
 pub fn serve_http(engine: &DocEngine, addr: impl ToSocketAddrs) -> io::Result<HttpServer> {
     let listener = TcpListener::bind(addr)?;
     listener.set_nonblocking(true)?;
