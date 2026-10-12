@@ -54,7 +54,7 @@ pub fn handle_json_rpc(engine: &DocEngine, request_str: &str) -> HandlerResult<O
                     },
                     "serverInfo": {
                         "name": engine.binary_name,
-                        "version": "0.2.0"
+                        "version": env!("CARGO_PKG_VERSION")
                     }
                 }
             });
