@@ -120,7 +120,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("{}", engine.hint("E001", RenderMode::Agent).unwrap()); // "Help: run 'kinema explain E001'"
     println!("{}", engine.hint("E001", RenderMode::Mcp).unwrap());   // "Help: call tool 'doc_read {\"id\": \"E001\"}'"
 
-    // 2. MCP Server (stdio or HTTP)
+    // 2. Register tools (typed or from clap)
+    #[cfg(feature = "clap")]
+    engine.register_clap_tools(cli_cmd, &["mcp"], |_subcmd, matches| {
+        // Receives root ArgMatches; deserialize directly into your Cli struct:
+        // let cli = Cli::from_arg_matches(&matches).unwrap();
+        agent_doc::mcp::ToolResult::text("Executed command").into()
+    })?;
+
+    // 3. MCP Server (stdio or HTTP)
     #[cfg(feature = "mcp-stdio")]
     if std::env::args().any(|a| a == "--mcp") {
         return engine.serve_stdio().map_err(Into::into);

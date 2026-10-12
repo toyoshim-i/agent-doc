@@ -772,7 +772,8 @@ impl DocEngine {
         Ok(self)
     }
 
-    /// Register clap subcommands as MCP tools, parsing inputs through clap's parser.
+    /// Register clap subcommands as MCP tools, passing the root `ArgMatches` to the handler.
+    /// This allows host applications to call `Cli::from_arg_matches(&matches)` directly.
     #[cfg(all(feature = "mcp", feature = "clap"))]
     pub fn register_clap_tools<F>(
         &mut self,
@@ -787,6 +788,27 @@ impl DocEngine {
             + 'static,
     {
         let tools = mcp::clap::tools_from_clap(cmd, exclude, handler);
+        for tool in tools {
+            self.register_tool(tool)?;
+        }
+        Ok(())
+    }
+
+    /// Register clap subcommands as MCP tools, passing each subcommand's `ArgMatches` to the handler.
+    #[cfg(all(feature = "mcp", feature = "clap"))]
+    pub fn register_clap_subcommand_tools<F>(
+        &mut self,
+        cmd: ::clap::Command,
+        exclude: &[&str],
+        handler: F,
+    ) -> Result<(), DocError>
+    where
+        F: Fn(&str, ::clap::ArgMatches) -> mcp::HandlerResult<mcp::ToolResult>
+            + Send
+            + Sync
+            + 'static,
+    {
+        let tools = mcp::clap::tools_from_clap_subcommand(cmd, exclude, handler);
         for tool in tools {
             self.register_tool(tool)?;
         }

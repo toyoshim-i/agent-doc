@@ -39,9 +39,9 @@ fn test_b4_clap_tools_acceptance() {
         .subcommand(Command::new("guide").about("Internal guide command - should be excluded"))
         .subcommand(Command::new("explain").about("Internal explain command - should be excluded"));
 
-    // Register clap subcommands excluding guide and explain
+    // Register clap subcommands excluding guide and explain (subcommand ArgMatches)
     engine
-        .register_clap_tools(cli, &["guide", "explain"], |subcmd, matches| {
+        .register_clap_subcommand_tools(cli, &["guide", "explain"], |subcmd, matches| {
             let schem: &String = matches.get_one("schematic").unwrap();
             let strict = matches.get_flag("strict");
             let files: Vec<String> = matches
@@ -110,4 +110,64 @@ fn test_b4_clap_tools_acceptance() {
     assert!(invalid_call.content[0]
         .text
         .contains("invalid value 'invalid_format'"));
+
+    // 4. Acceptance condition (Item 5 & 6): derive-based CLI from_arg_matches works on root ArgMatches
+    // Also tests SetFalse (cache=false) and hyphenated positional arguments (files=["-", "-v"])
+    use clap::{CommandFactory, FromArgMatches, Parser, Subcommand};
+
+    #[derive(Parser, Debug, PartialEq)]
+    #[command(name = "mycli")]
+    struct DeriveCli {
+        #[command(subcommand)]
+        command: DeriveCommands,
+    }
+
+    #[derive(Subcommand, Debug, PartialEq, Clone)]
+    enum DeriveCommands {
+        Lint {
+            #[arg(long)]
+            deny_warnings: bool,
+            #[arg(long, default_value_t = true, action = ArgAction::SetFalse)]
+            cache: bool,
+            files: Vec<String>,
+        },
+    }
+
+    let mut derive_engine = DocEngine::new("mycli");
+    derive_engine
+        .register_clap_tools(DeriveCli::command(), &[], |_subcmd, matches| {
+            let cli = DeriveCli::from_arg_matches(&matches).expect("from_arg_matches failed");
+            match cli.command {
+                DeriveCommands::Lint {
+                    deny_warnings,
+                    cache,
+                    files,
+                } => agent_doc::mcp::ToolResult::text(format!(
+                    "Linted: deny={deny_warnings}, cache={cache}, files={files:?}"
+                ))
+                .into(),
+            }
+        })
+        .unwrap();
+
+    // Call lint with deny_warnings=true, cache=false, files=["-", "-v"]
+    let derive_call = derive_engine
+        .mcp_call_tool(
+            "lint",
+            json!({
+                "deny_warnings": true,
+                "cache": false,
+                "files": ["-", "-v"]
+            }),
+        )
+        .unwrap();
+    assert!(
+        !derive_call.is_error,
+        "Derive call error: {:?}",
+        derive_call
+    );
+    assert_eq!(
+        derive_call.content[0].text,
+        "Linted: deny=true, cache=false, files=[\"-\", \"-v\"]"
+    );
 }

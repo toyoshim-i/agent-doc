@@ -8,8 +8,29 @@ pub fn tools_from_clap<F>(cmd: Command, exclude: &[&str], handler: F) -> Vec<Too
 where
     F: Fn(&str, clap::ArgMatches) -> HandlerResult<ToolResult> + Send + Sync + 'static,
 {
+    tools_from_clap_internal(cmd, exclude, handler, false)
+}
+
+pub fn tools_from_clap_subcommand<F>(cmd: Command, exclude: &[&str], handler: F) -> Vec<Tool>
+where
+    F: Fn(&str, clap::ArgMatches) -> HandlerResult<ToolResult> + Send + Sync + 'static,
+{
+    tools_from_clap_internal(cmd, exclude, handler, true)
+}
+
+fn tools_from_clap_internal<F>(
+    cmd: Command,
+    exclude: &[&str],
+    handler: F,
+    subcommand_matches: bool,
+) -> Vec<Tool>
+where
+    F: Fn(&str, clap::ArgMatches) -> HandlerResult<ToolResult> + Send + Sync + 'static,
+{
     let handler = Arc::new(handler);
     let mut tools = Vec::new();
+    let bin_name = cmd.get_name().to_string();
+    let root_parser = cmd.clone();
 
     for subcmd in cmd.get_subcommands() {
         let name = subcmd.get_name();
@@ -25,6 +46,7 @@ where
         let mut builder = Tool::builder(name, description);
         let mut positional_order = Vec::new();
         let mut flag_map = HashMap::new();
+        let mut set_false_flags = std::collections::HashSet::new();
 
         for arg in subcmd.get_arguments() {
             let arg_id = arg.get_id().as_str();
@@ -34,6 +56,11 @@ where
 
             let param_name = if let Some(long) = arg.get_long() {
                 flag_map.insert(long.to_string(), format!("--{long}"));
+                flag_map.insert(arg_id.to_string(), format!("--{long}"));
+                let kebab = arg_id.replace('_', "-");
+                flag_map.insert(kebab, format!("--{long}"));
+                let snake = long.replace('-', "_");
+                flag_map.insert(snake, format!("--{long}"));
                 long.to_string()
             } else if let Some(short) = arg.get_short() {
                 flag_map.insert(arg_id.to_string(), format!("-{short}"));
@@ -42,6 +69,13 @@ where
                 positional_order.push(arg_id.to_string());
                 arg_id.to_string()
             };
+
+            if matches!(arg.get_action(), ArgAction::SetFalse) {
+                set_false_flags.insert(param_name.clone());
+                set_false_flags.insert(arg_id.to_string());
+                set_false_flags.insert(arg_id.replace('_', "-"));
+                set_false_flags.insert(param_name.replace('-', "_"));
+            }
 
             let desc = arg.get_help().map(|h| h.to_string()).unwrap_or_default();
             let required = arg.is_required_set();
@@ -73,6 +107,8 @@ where
         let subcmd_parser = subcmd.clone();
         let subcmd_name = name.to_string();
         let h = Arc::clone(&handler);
+        let bin_name_clone = bin_name.clone();
+        let root_parser_clone = root_parser.clone();
 
         let tool = builder
             .skip_validation(true)
@@ -90,12 +126,19 @@ where
                             .get(key)
                             .cloned()
                             .unwrap_or_else(|| format!("--{key}"));
+                        let is_set_false = set_false_flags.contains(key);
 
                         match val {
                             serde_json::Value::Bool(true) => {
-                                options_argv.push(flag);
+                                if !is_set_false {
+                                    options_argv.push(flag);
+                                }
                             }
-                            serde_json::Value::Bool(false) => {}
+                            serde_json::Value::Bool(false) => {
+                                if is_set_false {
+                                    options_argv.push(flag);
+                                }
+                            }
                             serde_json::Value::Array(items) => {
                                 for item in items {
                                     options_argv.push(flag.clone());
@@ -146,13 +189,30 @@ where
                     }
                 }
 
-                let mut argv = vec![subcmd_name.clone()];
-                argv.extend(options_argv);
-                argv.extend(positionals_argv);
+                if subcommand_matches {
+                    let mut argv = vec![subcmd_name.clone()];
+                    argv.extend(options_argv);
+                    if !positionals_argv.is_empty() {
+                        argv.push("--".to_string());
+                        argv.extend(positionals_argv);
+                    }
 
-                match subcmd_parser.clone().try_get_matches_from(argv) {
-                    Ok(matches) => h(&subcmd_name, matches),
-                    Err(err) => ToolResult::error(err.to_string()).into(),
+                    match subcmd_parser.clone().try_get_matches_from(argv) {
+                        Ok(matches) => h(&subcmd_name, matches),
+                        Err(err) => ToolResult::error(err.to_string()).into(),
+                    }
+                } else {
+                    let mut argv = vec![bin_name_clone.clone(), subcmd_name.clone()];
+                    argv.extend(options_argv);
+                    if !positionals_argv.is_empty() {
+                        argv.push("--".to_string());
+                        argv.extend(positionals_argv);
+                    }
+
+                    match root_parser_clone.clone().try_get_matches_from(argv) {
+                        Ok(matches) => h(&subcmd_name, matches),
+                        Err(err) => ToolResult::error(err.to_string()).into(),
+                    }
                 }
             })
             .build();
