@@ -79,6 +79,7 @@ use agent_doc::{CategoryConfig, DocEngine, RenderMode};
 
 fn create_engine() -> DocEngine {
     let mut engine = DocEngine::new("kinema")
+        .with_version(env!("CARGO_PKG_VERSION")) // MCP serverInfo.version (defaults to agent-doc version if omitted)
         .with_subcommands("guide", "explain")
         .with_scheme("kinema")
         .with_categories(vec![

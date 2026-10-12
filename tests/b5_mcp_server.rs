@@ -44,6 +44,16 @@ category: guide
         _ => panic!("Expected Ready response for initialize"),
     }
 
+    // Engine configured with with_version returns host version
+    let engine_with_version = engine.clone().with_version("9.9.9");
+    match engine_with_version.handle(&init_req) {
+        HandlerResult::Ready(Some(res)) => {
+            let v: serde_json::Value = serde_json::from_str(&res).unwrap();
+            assert_eq!(v["result"]["serverInfo"]["version"], "9.9.9");
+        }
+        _ => panic!("Expected Ready response for initialize"),
+    }
+
     // Notification (no id) produces None
     let notif_req = json!({
         "jsonrpc": "2.0",

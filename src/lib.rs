@@ -31,6 +31,7 @@ pub struct DocEngine {
     pub scheme: String,
     pub index: DocIndex,
     pub categories: Vec<CategoryConfig>,
+    pub version: Option<String>,
     #[cfg(feature = "mcp")]
     pub tools: Vec<mcp::Tool>,
 }
@@ -45,9 +46,19 @@ impl DocEngine {
             explain_subcommand: "explain".to_string(),
             index: DocIndex::new(),
             categories: default_categories(),
+            version: None,
             #[cfg(feature = "mcp")]
             tools: Vec::new(),
         }
+    }
+
+    pub fn with_version(mut self, version: impl Into<String>) -> Self {
+        self.version = Some(version.into());
+        self
+    }
+
+    pub fn set_version(&mut self, version: impl Into<String>) {
+        self.version = Some(version.into());
     }
 
     pub fn with_subcommands(
