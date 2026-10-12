@@ -84,4 +84,27 @@ Separate nets.
     let guide_multiple = engine.guide(Some("pin"), RenderMode::Agent).unwrap();
     // Partial match on "pin" matches E001, but if multiple topics match, returns list of candidates
     assert!(guide_multiple.contains("E001"));
+
+    // 5. Acceptance condition (Item 7): Enclosing quotes in frontmatter are stripped
+    engine.add_page(
+        "docs/rules/hub-too-few.md",
+        r#"---
+id: hub-too-few
+title: "Rule: hub-too-few"
+summary: 'Hub has too few connections'
+category: "rule"
+---
+Details on hub connection requirements.
+"#,
+    );
+    let page = engine.lookup_exact("hub-too-few").unwrap();
+    assert_eq!(page.title, "Rule: hub-too-few");
+    assert_eq!(page.summary, "Hub has too few connections");
+    assert_eq!(page.category, "rule");
+
+    let explained = engine.explain("hub-too-few", RenderMode::Agent).unwrap();
+    assert!(
+        explained.contains("# Rule: hub-too-few"),
+        "Title in explain must not contain quotes: {explained}"
+    );
 }

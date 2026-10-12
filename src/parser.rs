@@ -15,7 +15,7 @@ pub fn parse_markdown_page(path_str: &str, content: &str) -> DocPage {
             }
             if let Some((k, v)) = line.split_once(':') {
                 let key = k.trim().to_lowercase();
-                let val = v.trim();
+                let val = strip_quotes(v);
                 frontmatter_map.insert(key, val.to_string());
             }
         }
@@ -113,6 +113,17 @@ fn parse_list_or_csv(s: &str) -> Vec<String> {
         .map(|item| item.trim().trim_matches('"').trim_matches('\'').to_string())
         .filter(|item| !item.is_empty())
         .collect()
+}
+
+fn strip_quotes(s: &str) -> &str {
+    let trimmed = s.trim();
+    if (trimmed.starts_with('"') && trimmed.ends_with('"') && trimmed.len() >= 2)
+        || (trimmed.starts_with('\'') && trimmed.ends_with('\'') && trimmed.len() >= 2)
+    {
+        &trimmed[1..trimmed.len() - 1]
+    } else {
+        trimmed
+    }
 }
 
 fn format_title(id: &str) -> String {
