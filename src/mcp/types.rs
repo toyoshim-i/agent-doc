@@ -122,7 +122,7 @@ where
         }
         let current = now();
         if current.saturating_sub(start) >= timeout {
-            return Err("MCP tool execution timed out waiting for the render loop".to_string());
+            return Err("MCP tool execution timed out".to_string());
         }
         yield_frame().await;
     }

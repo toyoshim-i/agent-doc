@@ -38,7 +38,31 @@ pub struct WebMcpInstalled {
     pub refused: Vec<(String, String)>,
 }
 
-/// Yields control to the browser animation frame queue so the host render loop can advance.
+/// Query current time in milliseconds, trying `window.performance`, `globalThis.performance`,
+/// and falling back to `Date.now()`. This ensures timeouts advance even in Web Workers or
+/// environments where `window` or `performance` is unavailable.
+fn current_time_ms() -> f64 {
+    if let Some(win) = web_sys::window() {
+        if let Some(perf) = win.performance() {
+            return perf.now();
+        }
+    }
+    let global = js_sys::global();
+    if let Ok(perf_val) = js_sys::Reflect::get(&global, &"performance".into()) {
+        if let Ok(now_val) = js_sys::Reflect::get(&perf_val, &"now".into()) {
+            if let Ok(now_fn) = now_val.dyn_into::<js_sys::Function>() {
+                if let Ok(res) = now_fn.call0(&perf_val) {
+                    if let Some(ms) = res.as_f64() {
+                        return ms;
+                    }
+                }
+            }
+        }
+    }
+    js_sys::Date::now()
+}
+
+/// Yields control to the browser animation frame queue so the host can advance.
 async fn yield_to_browser() {
     let promise = js_sys::Promise::new(&mut |resolve, _| {
         if let Some(win) = web_sys::window() {
@@ -51,6 +75,46 @@ async fn yield_to_browser() {
         }
     });
     let _ = wasm_bindgen_futures::JsFuture::from(promise).await;
+}
+
+/// Parses JS arguments into JSON Value. Rejects non-JSON or invalid arguments with an error.
+fn parse_tool_args(args: JsValue) -> Result<serde_json::Value, String> {
+    if args.is_null() || args.is_undefined() {
+        return Ok(serde_json::Value::Object(serde_json::Map::new()));
+    }
+    let args_json = js_sys::JSON::stringify(&args)
+        .map_err(|e| format!("Failed to serialize tool arguments: {e:?}"))?
+        .as_string()
+        .ok_or_else(|| "Tool arguments could not be converted to JSON string".to_string())?;
+
+    serde_json::from_str(&args_json).map_err(|e| format!("Invalid JSON in tool arguments: {e}"))
+}
+
+/// Helper that invokes a tool and returns a JavaScript Promise resolving with ToolResult,
+/// or rejecting on invalid arguments or timeout.
+fn invoke_tool_js(
+    engine: Rc<DocEngine>,
+    name: String,
+    args: JsValue,
+    options: Rc<WebMcpOptions>,
+) -> js_sys::Promise {
+    let args_value = match parse_tool_args(args) {
+        Ok(v) => v,
+        Err(err) => return js_sys::Promise::reject(&JsValue::from_str(&err)),
+    };
+
+    wasm_bindgen_futures::future_to_promise(async move {
+        match call_tool(&engine, &name, args_value, &options).await {
+            Ok(tool_res) => {
+                let json_str = serde_json::to_string(&tool_res)
+                    .map_err(|e| JsValue::from_str(&e.to_string()))?;
+                let js_val =
+                    js_sys::JSON::parse(&json_str).unwrap_or_else(|_| JsValue::from_str(&json_str));
+                Ok(js_val)
+            }
+            Err(err) => Err(JsValue::from_str(&err)),
+        }
+    })
 }
 
 /// Calls one tool and waits for its result without blocking the browser.
@@ -69,11 +133,7 @@ pub async fn call_tool(
         HandlerResult::Ready(tool_res) => Ok(tool_res),
         HandlerResult::Pending(mut pending) => {
             let timeout = options.timeout;
-            let perf = web_sys::window().and_then(|w| w.performance());
-            let now = move || {
-                let ms = perf.as_ref().map(|p| p.now()).unwrap_or(0.0);
-                Duration::from_secs_f64(ms / 1000.0)
-            };
+            let now = || Duration::from_secs_f64(current_time_ms() / 1000.0);
             poll_until_settled(&mut *pending, timeout, yield_to_browser, now).await
         }
     }
@@ -131,32 +191,12 @@ fn discover_and_register_webmcp(
         let name_clone = name_str.clone();
 
         let execute_fn = Closure::wrap(Box::new(move |args: JsValue| -> js_sys::Promise {
-            let engine = Rc::clone(&engine_clone);
-            let options = Rc::clone(&options_clone);
-            let name = name_clone.clone();
-
-            let args_value: serde_json::Value = if args.is_null() || args.is_undefined() {
-                serde_json::Value::Object(serde_json::Map::new())
-            } else {
-                let args_json = js_sys::JSON::stringify(&args)
-                    .ok()
-                    .and_then(|s| s.as_string())
-                    .unwrap_or_else(|| "{}".into());
-                serde_json::from_str(&args_json).unwrap_or_default()
-            };
-
-            wasm_bindgen_futures::future_to_promise(async move {
-                match call_tool(&engine, &name, args_value, &options).await {
-                    Ok(tool_res) => {
-                        let json_str = serde_json::to_string(&tool_res)
-                            .map_err(|e| JsValue::from_str(&e.to_string()))?;
-                        let js_val = js_sys::JSON::parse(&json_str)
-                            .unwrap_or_else(|_| JsValue::from_str(&json_str));
-                        Ok(js_val)
-                    }
-                    Err(err) => Err(JsValue::from_str(&err)),
-                }
-            })
+            invoke_tool_js(
+                Rc::clone(&engine_clone),
+                name_clone.clone(),
+                args,
+                Rc::clone(&options_clone),
+            )
         }) as Box<dyn FnMut(JsValue) -> js_sys::Promise>);
 
         let tool_obj = js_sys::Object::new();
@@ -208,31 +248,12 @@ pub fn install(engine: Rc<DocEngine>, options: WebMcpOptions) -> Result<WebMcpIn
         let options_for_call = Rc::clone(&options);
         let call_tool_closure = Closure::wrap(Box::new(
             move |name: String, args: JsValue| -> js_sys::Promise {
-                let engine = Rc::clone(&engine_for_call);
-                let options = Rc::clone(&options_for_call);
-
-                let args_value: serde_json::Value = if args.is_null() || args.is_undefined() {
-                    serde_json::Value::Object(serde_json::Map::new())
-                } else {
-                    let args_json = js_sys::JSON::stringify(&args)
-                        .ok()
-                        .and_then(|s| s.as_string())
-                        .unwrap_or_else(|| "{}".into());
-                    serde_json::from_str(&args_json).unwrap_or_default()
-                };
-
-                wasm_bindgen_futures::future_to_promise(async move {
-                    match call_tool(&engine, &name, args_value, &options).await {
-                        Ok(tool_res) => {
-                            let json_str = serde_json::to_string(&tool_res)
-                                .map_err(|e| JsValue::from_str(&e.to_string()))?;
-                            let js_val = js_sys::JSON::parse(&json_str)
-                                .unwrap_or_else(|_| JsValue::from_str(&json_str));
-                            Ok(js_val)
-                        }
-                        Err(err) => Err(JsValue::from_str(&err)),
-                    }
-                })
+                invoke_tool_js(
+                    Rc::clone(&engine_for_call),
+                    name,
+                    args,
+                    Rc::clone(&options_for_call),
+                )
             },
         )
             as Box<dyn FnMut(String, JsValue) -> js_sys::Promise>);

@@ -122,9 +122,6 @@ fn test_poll_timeout() {
         },
     ));
 
-    assert_eq!(
-        res,
-        Err("MCP tool execution timed out waiting for the render loop".to_string())
-    );
+    assert_eq!(res, Err("MCP tool execution timed out".to_string()));
     assert!(yields.load(Ordering::SeqCst) > 0);
 }
