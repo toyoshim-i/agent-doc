@@ -1,7 +1,7 @@
 #[cfg(feature = "mcp")]
 #[test]
 fn test_b2_mcp_docs_acceptance() {
-    use agent_doc::DocEngine;
+    use agent_man::DocEngine;
     use serde_json::json;
 
     let mut engine = DocEngine::new("kinema").with_scheme("kinema");

@@ -1,7 +1,7 @@
 #[cfg(all(feature = "mcp", feature = "clap"))]
 #[test]
 fn test_b4_clap_tools_acceptance() {
-    use agent_doc::DocEngine;
+    use agent_man::DocEngine;
     use clap::{Arg, ArgAction, Command};
     use serde_json::json;
 
@@ -48,7 +48,7 @@ fn test_b4_clap_tools_acceptance() {
                 .get_many::<String>("files")
                 .map(|vals| vals.cloned().collect())
                 .unwrap_or_default();
-            agent_doc::mcp::ToolResult::text(format!(
+            agent_man::mcp::ToolResult::text(format!(
                 "Ran {subcmd} on {schem} (strict: {strict}, files: {files:?})"
             ))
             .into()
@@ -148,7 +148,7 @@ fn test_b4_clap_tools_acceptance() {
                     color,
                     show_headers,
                     files,
-                } => agent_doc::mcp::ToolResult::text(format!(
+                } => agent_man::mcp::ToolResult::text(format!(
                     "Linted: deny={deny_warnings}, cache={cache}, color={color}, headers={show_headers}, files={files:?}"
                 ))
                 .into(),

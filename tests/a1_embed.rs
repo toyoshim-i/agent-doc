@@ -3,7 +3,7 @@
 fn test_a1_embed_directory_acceptance() {
     use std::fs;
 
-    let temp_dir = std::env::temp_dir().join("agent_doc_test_a1");
+    let temp_dir = std::env::temp_dir().join("agent_man_test_a1");
     let docs_dir = temp_dir.join("docs");
     let out_dir = temp_dir.join("out");
 
@@ -29,9 +29,9 @@ Welcome.
 
     // Run build embed helper with custom OUT_DIR
     std::env::set_var("OUT_DIR", &out_dir);
-    agent_doc::build::embed(&docs_dir).unwrap();
+    agent_man::build::embed(&docs_dir).unwrap();
 
-    let output_file = out_dir.join("agent_doc_pages.rs");
+    let output_file = out_dir.join("agent_man_pages.rs");
     assert!(
         output_file.exists(),
         "Embedded source file must be generated"
@@ -60,7 +60,7 @@ Details of E001.
     .unwrap();
 
     // Re-run embed
-    agent_doc::build::embed(&docs_dir).unwrap();
+    agent_man::build::embed(&docs_dir).unwrap();
 
     let code_v2 = fs::read_to_string(&output_file).unwrap();
     assert!(code_v2.contains("guide.md"));

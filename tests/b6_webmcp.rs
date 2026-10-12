@@ -1,7 +1,7 @@
 #![cfg(feature = "mcp")]
 
-use agent_doc::mcp::poll_until_settled;
-use agent_doc::mcp::types::PendingResult;
+use agent_man::mcp::poll_until_settled;
+use agent_man::mcp::types::PendingResult;
 use std::future::Future;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;

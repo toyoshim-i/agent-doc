@@ -1,4 +1,4 @@
-use agent_doc::{DocEngine, DocError, RenderMode};
+use agent_man::{DocEngine, DocError, RenderMode};
 
 #[test]
 fn test_a2_diagnostics_acceptance() {

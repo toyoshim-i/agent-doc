@@ -1,4 +1,4 @@
-use agent_doc::{DocEngine, RenderMode};
+use agent_man::{DocEngine, RenderMode};
 
 #[test]
 fn test_b1_render_mcp_acceptance() {

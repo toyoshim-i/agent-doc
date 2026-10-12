@@ -1,11 +1,11 @@
 [package]
-name = "agent-doc"
+name = "agent-man"
 version = "0.4.1"
 edition = "2021"
 authors = ["Takashi Toyoshima <toyoshim@gmail.com>"]
 license = "MIT OR Apache-2.0"
 description = "Context-engineering-free, agent-native documentation and explain engine for command-line tools"
-repository = "https://github.com/toyoshim-i/agent-doc"
+repository = "https://github.com/toyoshim-i/agent-man"
 readme = "README.md"
 keywords = ["cli", "documentation", "agent", "markdown", "hyperlink"]
 categories = ["command-line-utilities", "development-tools"]

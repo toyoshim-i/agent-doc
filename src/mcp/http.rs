@@ -59,7 +59,7 @@ pub fn serve_http(engine: &DocEngine, addr: impl ToSocketAddrs) -> io::Result<Ht
     let engine_clone = engine.clone();
 
     let join_handle = std::thread::Builder::new()
-        .name("agent-doc-http".into())
+        .name("agent-man-http".into())
         .spawn(move || {
             while !shutdown_thread.load(Ordering::Relaxed) {
                 match listener.accept() {

@@ -3,10 +3,10 @@ use std::io::{self, Error, ErrorKind};
 use std::path::{Path, PathBuf};
 
 /// Default generated file name in `OUT_DIR`.
-pub const DEFAULT_EMBED_FILE: &str = "agent_doc_pages.rs";
+pub const DEFAULT_EMBED_FILE: &str = "agent_man_pages.rs";
 
 /// Scan `dir` recursively for `.md` files and generate an array of `(path, include_str!(...))`
-/// into `$OUT_DIR/agent_doc_pages.rs`.
+/// into `$OUT_DIR/agent_man_pages.rs`.
 ///
 /// Emits `cargo:rerun-if-changed` for `dir` and all scanned markdown files.
 pub fn embed(dir: impl AsRef<Path>) -> io::Result<()> {

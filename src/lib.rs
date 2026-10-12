@@ -561,7 +561,7 @@ impl DocEngine {
         broken
     }
 
-    /// Compare content against an on-disk file, or update it when `AGENT_DOC_BLESS=1`.
+    /// Compare content against an on-disk file, or update it when `AGENT_MAN_BLESS=1`.
     pub fn assert_or_bless(
         &self,
         file_path: impl AsRef<std::path::Path>,
@@ -903,10 +903,12 @@ fn clean_doc_path(path: &str) -> &str {
     path.strip_prefix("docs/").unwrap_or(path)
 }
 
-/// Compare content against an on-disk file, or update it when `AGENT_DOC_BLESS=1` or `AGENT_DOC_BLESS=true`.
+/// Compare content against an on-disk file, or update it when `AGENT_MAN_BLESS=1` or `AGENT_MAN_BLESS=true`.
+/// Also supports legacy `AGENT_DOC_BLESS=1` for backward compatibility.
 pub fn assert_or_bless(file_path: impl AsRef<std::path::Path>, actual: &str) -> Result<(), String> {
     let path = file_path.as_ref();
-    let bless = std::env::var("AGENT_DOC_BLESS")
+    let bless = std::env::var("AGENT_MAN_BLESS")
+        .or_else(|_| std::env::var("AGENT_DOC_BLESS"))
         .map(|v| v == "1" || v.eq_ignore_ascii_case("true"))
         .unwrap_or(false);
 
@@ -919,7 +921,7 @@ pub fn assert_or_bless(file_path: impl AsRef<std::path::Path>, actual: &str) -> 
     } else {
         if !path.exists() {
             return Err(format!(
-                "File does not exist: {}. Set AGENT_DOC_BLESS=1 to generate.",
+                "File does not exist: {}. Set AGENT_MAN_BLESS=1 to generate.",
                 path.display()
             ));
         }
@@ -928,7 +930,7 @@ pub fn assert_or_bless(file_path: impl AsRef<std::path::Path>, actual: &str) -> 
             Ok(())
         } else {
             Err(format!(
-                "Content mismatch for {}:\n--- On disk:\n{}\n--- Generated:\n{}\nSet AGENT_DOC_BLESS=1 to update.",
+                "Content mismatch for {}:\n--- On disk:\n{}\n--- Generated:\n{}\nSet AGENT_MAN_BLESS=1 to update.",
                 path.display(),
                 current,
                 actual
@@ -942,7 +944,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_agent_doc_index_and_link_rewriting() {
+    fn test_agent_man_index_and_link_rewriting() {
         let mut engine = DocEngine::new("kinema");
 
         let guide_md = r#"---

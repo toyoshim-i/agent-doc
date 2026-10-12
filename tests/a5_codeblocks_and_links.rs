@@ -1,4 +1,4 @@
-use agent_doc::DocEngine;
+use agent_man::DocEngine;
 
 #[test]
 fn test_a5_codeblocks_and_links_acceptance() {

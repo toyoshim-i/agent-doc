@@ -1,8 +1,8 @@
 #[cfg(all(feature = "mcp", feature = "mcp-stdio", feature = "mcp-http"))]
 #[test]
 fn test_b5_mcp_server_acceptance() {
-    use agent_doc::mcp::{HandlerResult, Tool, ToolResult};
-    use agent_doc::DocEngine;
+    use agent_man::mcp::{HandlerResult, Tool, ToolResult};
+    use agent_man::DocEngine;
     use serde_json::json;
     use std::io::{BufRead, Read, Write};
     use std::net::TcpStream;
@@ -259,18 +259,18 @@ category: guide
         rx: std::sync::mpsc::Receiver<String>,
     }
 
-    impl agent_doc::mcp::PendingResult<agent_doc::mcp::ToolResult> for KarakuriAsyncTool {
-        fn poll_settled(&mut self) -> Option<agent_doc::mcp::ToolResult> {
+    impl agent_man::mcp::PendingResult<agent_man::mcp::ToolResult> for KarakuriAsyncTool {
+        fn poll_settled(&mut self) -> Option<agent_man::mcp::ToolResult> {
             match self.rx.try_recv() {
-                Ok(msg) => Some(agent_doc::mcp::ToolResult::text(msg)),
+                Ok(msg) => Some(agent_man::mcp::ToolResult::text(msg)),
                 Err(_) => None,
             }
         }
 
         #[cfg(not(target_arch = "wasm32"))]
-        fn settled(self: Box<Self>) -> agent_doc::mcp::ToolResult {
+        fn settled(self: Box<Self>) -> agent_man::mcp::ToolResult {
             let msg = self.rx.recv().unwrap();
-            agent_doc::mcp::ToolResult::text(msg)
+            agent_man::mcp::ToolResult::text(msg)
         }
     }
 
@@ -312,8 +312,8 @@ trait IsReadyHelper {
 }
 
 #[cfg(all(feature = "mcp", feature = "mcp-stdio", feature = "mcp-http"))]
-impl<T> IsReadyHelper for agent_doc::mcp::HandlerResult<T> {
+impl<T> IsReadyHelper for agent_man::mcp::HandlerResult<T> {
     fn is_ready(&self) -> bool {
-        matches!(self, agent_doc::mcp::HandlerResult::Ready(_))
+        matches!(self, agent_man::mcp::HandlerResult::Ready(_))
     }
 }

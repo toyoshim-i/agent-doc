@@ -1,13 +1,13 @@
-# agent-doc
+# agent-man
 
 > **Context-engineering-free, agent-native documentation and MCP integration engine**
 
-[![CI](https://github.com/toyoshim-i/agent-doc/actions/workflows/ci.yml/badge.svg)](https://github.com/toyoshim-i/agent-doc/actions/workflows/ci.yml)
-[![Crates.io](https://img.shields.io/crates/v/agent-doc.svg)](https://crates.io/crates/agent-doc)
-[![Docs.rs](https://docs.rs/agent-doc/badge.svg)](https://docs.rs/agent-doc)
+[![CI](https://github.com/toyoshim-i/agent-man/actions/workflows/ci.yml/badge.svg)](https://github.com/toyoshim-i/agent-man/actions/workflows/ci.yml)
+[![Crates.io](https://img.shields.io/crates/v/agent-man.svg)](https://crates.io/crates/agent-man)
+[![Docs.rs](https://docs.rs/agent-man/badge.svg)](https://docs.rs/agent-man)
 [![License](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](LICENSE)
 
-`agent-doc` is an embedded documentation and Model Context Protocol (MCP) engine for Rust CLI tools, agent frameworks, and web runtimes. It turns a single source of Markdown documentation into an on-demand CLI knowledge system, static entry points (`SUMMARY.md`, `SKILL.md`, `llms.txt`), and production MCP servers.
+`agent-man` is an embedded documentation and Model Context Protocol (MCP) engine for Rust CLI tools, agent frameworks, and web runtimes. It turns a single source of Markdown documentation into an on-demand CLI knowledge system, static entry points (`SUMMARY.md`, `SKILL.md`, `llms.txt`), and production MCP servers.
 
 ---
 
@@ -15,7 +15,7 @@
 
 Dumping massive prompt files or skill definitions into LLM contexts causes prompt bloat, high token costs, and instruction degradation. 
 
-`agent-doc` enables **context-engineering-free** design:
+`agent-man` enables **context-engineering-free** design:
 1. **Self-Evident Discovery**: CLI `--help` points agents directly to your in-binary guide (`mycli guide`).
 2. **Just-in-Time Knowledge**: Agents retrieve specific topics (`mycli guide <topic>`) only when relevant, keeping working contexts clean.
 3. **Automated Diagnostic Remediation**: Diagnostics emit self-documenting hints (`Help: run 'mycli explain <code>'` or `Help: call tool 'doc_read {"id": "<code>"}'`). Agents or MCP clients receive actionable root-cause analysis and code fixes.
@@ -52,11 +52,12 @@ Dumping massive prompt files or skill definitions into LLM contexts causes promp
 | Feature | Description | Dependencies |
 | :--- | :--- | :--- |
 | *default* | Core parser, index, link rewriter, and static entry points | `serde`, `serde_json`, `thiserror` |
-| `build` | Compile-time directory scanner and embedding helper (`agent_doc::build::embed`) | None |
+| `build` | Compile-time directory scanner and embedding helper (`agent_man::build::embed`) | None |
 | `mcp` | MCP types, tool builder, JSON Schema generator, and `DocEngine::handle()` | None |
 | `mcp-stdio` | MCP standard input/output transport (`serve_stdio()`) | `mcp` |
 | `mcp-http` | MCP HTTP POST loopback transport (`serve_http()`) using `std::net` | `mcp` |
 | `clap` | Auto-generate MCP tools from `clap::Command` subcommands | `mcp`, `clap` |
+| `webmcp` | WebMCP browser integration (`install()`, `call_tool()`) for `wasm32` | `mcp`, `wasm-bindgen`, `js-sys`, `web-sys`, `wasm-bindgen-futures` |
 
 ---
 
@@ -68,18 +69,18 @@ Dumping massive prompt files or skill definitions into LLM contexts causes promp
 // build.rs
 fn main() {
     #[cfg(feature = "build")]
-    agent_doc::build::embed("docs", "agent_doc_pages.rs");
+    agent_man::build::embed("docs", "agent_man_pages.rs");
 }
 ```
 
 ### 2. Host Integration (`src/main.rs`)
 
 ```rust
-use agent_doc::{CategoryConfig, DocEngine, RenderMode};
+use agent_man::{CategoryConfig, DocEngine, RenderMode};
 
 fn create_engine() -> DocEngine {
     let mut engine = DocEngine::new("kinema")
-        .with_version(env!("CARGO_PKG_VERSION")) // MCP serverInfo.version (defaults to agent-doc version if omitted)
+        .with_version(env!("CARGO_PKG_VERSION")) // MCP serverInfo.version (defaults to agent-man version if omitted)
         .with_subcommands("guide", "explain")
         .with_scheme("kinema")
         .with_categories(vec![
@@ -88,7 +89,7 @@ fn create_engine() -> DocEngine {
         ]);
 
     // Include the generated pages from build.rs
-    // include!(concat!(env!("OUT_DIR"), "/agent_doc_pages.rs"));
+    // include!(concat!(env!("OUT_DIR"), "/agent_man_pages.rs"));
     engine.add_page("docs/intro.md", r#"---
 id: intro
 title: Intro Guide
@@ -125,7 +126,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     engine.register_clap_tools(cli_cmd, &["mcp"], |_subcmd, matches| {
         // Receives root ArgMatches; deserialize directly into your Cli struct:
         // let cli = Cli::from_arg_matches(&matches).unwrap();
-        agent_doc::mcp::ToolResult::text("Executed command").into()
+        agent_man::mcp::ToolResult::text("Executed command").into()
     })?;
 
     // 3. MCP Server (stdio or HTTP)
@@ -146,7 +147,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     #[cfg(feature = "mcp")]
     {
         let request = r#"{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}"#;
-        if let agent_doc::mcp::HandlerResult::Ready(Some(resp)) = engine.handle(request) {
+        if let agent_man::mcp::HandlerResult::Ready(Some(resp)) = engine.handle(request) {
             println!("MCP Response: {resp}");
         }
     }
@@ -158,14 +159,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 ### 3. Static Documentation & CI Tests (`tests/doc_tests.rs`)
 
 ```rust
-use agent_doc::DocEngine;
+use agent_man::DocEngine;
 use std::path::Path;
 
 #[test]
 fn test_documentation_freshness_and_lints() {
     let engine = create_engine();
 
-    // 1. Maintain static entrypoints (or update with AGENT_DOC_BLESS=1)
+    // 1. Maintain static entrypoints (or update with AGENT_MAN_BLESS=1)
     DocEngine::assert_or_bless(Path::new("docs/SUMMARY.md"), &engine.summary_md()).unwrap();
     DocEngine::assert_or_bless(Path::new("SKILL.md"), &engine.skill_md("kinema-guide", &[])).unwrap();
     DocEngine::assert_or_bless(Path::new("llms.txt"), &engine.llms_txt("https://example.com/docs")).unwrap();
@@ -183,13 +184,13 @@ fn test_documentation_freshness_and_lints() {
 
 ### 4. WebMCP Browser Integration (wasm32)
 
-When running in browser environments via WebAssembly, `agent-doc` provides integration with the W3C Web Model Context Protocol (`document.modelContext` / `navigator.modelContext`) and exposes tools to browser extensions or DevTools consoles.
+When running in browser environments via WebAssembly, `agent-man` provides integration with the W3C Web Model Context Protocol (`document.modelContext` / `navigator.modelContext`) and exposes tools to browser extensions or DevTools consoles.
 
 Enable the `webmcp` feature in your WebAssembly target dependencies:
 
 ```toml
 [target.'cfg(target_arch = "wasm32")'.dependencies]
-agent-doc = { version = "0.4", features = ["webmcp"] }
+agent-man = { version = "0.4", features = ["webmcp"] }
 ```
 
 In your browser initialization:
@@ -197,7 +198,7 @@ In your browser initialization:
 ```rust
 #[cfg(all(feature = "webmcp", target_arch = "wasm32"))]
 {
-    use agent_doc::webmcp::{install, WebMcpOptions};
+    use agent_man::webmcp::{install, WebMcpOptions};
     use std::rc::Rc;
     use std::time::Duration;
 
@@ -227,7 +228,7 @@ In your browser initialization:
 - **Context discovery**: `install` searches `document.modelContext` followed by `navigator.modelContext`. If neither is found or `registerTool` is missing, `installed.model_context` is `false` without failing.
 - **Global object**: When `global_name` is set, `window[name]` exposes `listTools()`, `callTool(name, args)`, `listResources()`, and `readResource(uri)`.
 - **AnimationFrame queue**: Pending results yield control using `requestAnimationFrame`. Note that in background tabs where the browser suspends animation frames, tool waiting also pauses until the tab is focused.
-- **Verification**: In-browser execution cannot be tested in `agent-doc`'s own CI environment; host applications (e.g. Karakuri's browser harness) should verify end-to-end WebMCP interactions in their browser test suites.
+- **Verification**: In-browser execution cannot be tested in `agent-man`'s own CI environment; host applications (e.g. Karakuri's browser harness) should verify end-to-end WebMCP interactions in their browser test suites.
 
 ---
 

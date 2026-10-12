@@ -1,4 +1,4 @@
-use agent_doc::DocEngine;
+use agent_man::DocEngine;
 
 #[test]
 fn test_a3_static_entrypoints_acceptance() {
@@ -58,11 +58,11 @@ Identity missing rule.
 
     // Set host custom categories (kinema uses "Design Guides & Best Practices")
     engine.set_categories(vec![
-        agent_doc::CategoryConfig::new("getting-started", "Getting Started & Migration")
+        agent_man::CategoryConfig::new("getting-started", "Getting Started & Migration")
             .with_aliases(["start", "migration"]),
-        agent_doc::CategoryConfig::new("guide", "Design Guides & Best Practices")
+        agent_man::CategoryConfig::new("guide", "Design Guides & Best Practices")
             .with_aliases(["guides", "best-practices"]),
-        agent_doc::CategoryConfig::new("rule", "Diagnostics & Rules")
+        agent_man::CategoryConfig::new("rule", "Diagnostics & Rules")
             .with_aliases(["rules", "diagnostic", "diagnostics"])
             .with_id_as_title(true),
     ]);
@@ -99,16 +99,17 @@ Identity missing rule.
     assert!(llms.contains("KiCad Project Migration"));
 
     // 4. Test helper assert_or_bless
-    let temp_file = std::env::temp_dir().join("agent_doc_bless_test.md");
+    let temp_file = std::env::temp_dir().join("agent_man_bless_test.md");
     std::fs::write(&temp_file, "old content").unwrap();
 
-    // Without AGENT_DOC_BLESS, mismatched content fails
+    // Without AGENT_MAN_BLESS, mismatched content fails
+    std::env::remove_var("AGENT_MAN_BLESS");
     std::env::remove_var("AGENT_DOC_BLESS");
     let res = engine.assert_or_bless(&temp_file, "new content");
     assert!(res.is_err());
 
-    // With AGENT_DOC_BLESS=1, it updates file
-    std::env::set_var("AGENT_DOC_BLESS", "1");
+    // With AGENT_MAN_BLESS=1, it updates file
+    std::env::set_var("AGENT_MAN_BLESS", "1");
     let res = engine.assert_or_bless(&temp_file, "new content");
     assert!(res.is_ok());
     assert_eq!(std::fs::read_to_string(&temp_file).unwrap(), "new content");

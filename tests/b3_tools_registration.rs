@@ -1,8 +1,8 @@
 #[cfg(feature = "mcp")]
 #[test]
 fn test_b3_tools_registration_acceptance() {
-    use agent_doc::mcp::{ParamType, Tool};
-    use agent_doc::DocEngine;
+    use agent_man::mcp::{ParamType, Tool};
+    use agent_man::DocEngine;
     use serde_json::json;
 
     let mut engine = DocEngine::new("kinema").with_scheme("kinema");
@@ -47,7 +47,7 @@ Details.
         }))
         .handler(|args| {
             let pin_id = args["pin_id"].as_str().unwrap_or("");
-            agent_doc::mcp::ToolResult::text(format!("Configured pin {pin_id}")).into()
+            agent_man::mcp::ToolResult::text(format!("Configured pin {pin_id}")).into()
         })
         .build();
 
@@ -129,7 +129,7 @@ Details.
     // 4. Acceptance condition: check_tools detects broken .see references and invalid examples
     let tool_broken_see = Tool::builder("bad_tool", "Bad tool")
         .see("nonexistent-page-id")
-        .handler(|_| agent_doc::mcp::ToolResult::text("ok").into())
+        .handler(|_| agent_man::mcp::ToolResult::text("ok").into())
         .build();
     engine.register_tool(tool_broken_see).unwrap();
 
@@ -138,7 +138,7 @@ Details.
     assert!(issues.iter().any(|i| i.contains("nonexistent-page-id")));
 
     // 5. Acceptance condition: ToolResult::error_structured serializes with both isError: true and structuredContent
-    let err_structured = agent_doc::mcp::ToolResult::error_structured(
+    let err_structured = agent_man::mcp::ToolResult::error_structured(
         "Refused due to rule violation",
         json!({
             "code": "REFUSAL_UNWIRED",
@@ -155,7 +155,7 @@ Details.
 
     // 6. Acceptance condition: registering 'doc_read' or a duplicate tool name is detected and rejected
     let reserved_tool = Tool::builder("doc_read", "Reserved tool name")
-        .handler(|_| agent_doc::mcp::ToolResult::text("ok").into())
+        .handler(|_| agent_man::mcp::ToolResult::text("ok").into())
         .build();
     let res_reserved = engine.register_tool(reserved_tool);
     assert!(
@@ -164,7 +164,7 @@ Details.
     );
 
     let dup_tool = Tool::builder("configure_pin", "Duplicate tool name")
-        .handler(|_| agent_doc::mcp::ToolResult::text("ok").into())
+        .handler(|_| agent_man::mcp::ToolResult::text("ok").into())
         .build();
     let res_dup = engine.register_tool(dup_tool);
     assert!(

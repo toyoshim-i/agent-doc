@@ -1,4 +1,4 @@
-use agent_doc::{CategoryConfig, DocEngine, RenderMode};
+use agent_man::{CategoryConfig, DocEngine, RenderMode};
 
 #[test]
 fn test_a4_custom_categories_acceptance() {
