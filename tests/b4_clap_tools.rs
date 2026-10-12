@@ -29,6 +29,11 @@ fn test_b4_clap_tools_acceptance() {
                         .long("format")
                         .value_parser(["json", "text"])
                         .help("Output format"),
+                )
+                .arg(
+                    Arg::new("files")
+                        .action(ArgAction::Append)
+                        .help("Verilog files to check"),
                 ),
         )
         .subcommand(Command::new("guide").about("Internal guide command - should be excluded"))
@@ -38,8 +43,14 @@ fn test_b4_clap_tools_acceptance() {
     engine.register_clap_tools(cli, &["guide", "explain"], |subcmd, matches| {
         let schem: &String = matches.get_one("schematic").unwrap();
         let strict = matches.get_flag("strict");
-        agent_doc::mcp::ToolResult::text(format!("Ran {subcmd} on {schem} (strict: {strict})"))
-            .into()
+        let files: Vec<String> = matches
+            .get_many::<String>("files")
+            .map(|vals| vals.cloned().collect())
+            .unwrap_or_default();
+        agent_doc::mcp::ToolResult::text(format!(
+            "Ran {subcmd} on {schem} (strict: {strict}, files: {files:?})"
+        ))
+        .into()
     });
 
     // 1. tools/list: "check" is registered, while "guide" and "explain" are excluded
@@ -58,24 +69,30 @@ fn test_b4_clap_tools_acceptance() {
         "boolean"
     );
     assert_eq!(
+        check_tool.input_schema["properties"]["files"]["type"],
+        "array"
+    );
+    assert_eq!(
         check_tool.input_schema["properties"]["format"]["enum"],
         json!(["json", "text"])
     );
 
     // 2. Acceptance condition: Invocation passes through clap try_get_matches_from
+    // Positional arguments (files) are passed without '--files' flag
     let valid_call = engine
         .mcp_call_tool(
             "check",
             json!({
                 "schematic": "board.v",
-                "strict": true
+                "strict": true,
+                "files": ["examples/timer_core.v", "examples/sub.v"]
             }),
         )
         .unwrap();
     assert!(!valid_call.is_error);
     assert!(valid_call.content[0]
         .text
-        .contains("Ran check on board.v (strict: true)"));
+        .contains("Ran check on board.v (strict: true, files: [\"examples/timer_core.v\", \"examples/sub.v\"])"));
 
     // 3. Acceptance condition: Clap parser rejects invalid input identically to CLI
     let invalid_call = engine
