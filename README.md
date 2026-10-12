@@ -181,6 +181,54 @@ fn test_documentation_freshness_and_lints() {
 }
 ```
 
+### 4. WebMCP Browser Integration (wasm32)
+
+When running in browser environments via WebAssembly, `agent-doc` provides integration with the W3C Web Model Context Protocol (`document.modelContext` / `navigator.modelContext`) and exposes tools to browser extensions or DevTools consoles.
+
+Enable the `webmcp` feature in your WebAssembly target dependencies:
+
+```toml
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+agent-doc = { version = "0.4", features = ["webmcp"] }
+```
+
+In your browser initialization:
+
+```rust
+#[cfg(all(feature = "webmcp", target_arch = "wasm32"))]
+{
+    use agent_doc::webmcp::{install, WebMcpOptions};
+    use std::rc::Rc;
+    use std::time::Duration;
+
+    let engine = Rc::new(create_engine());
+
+    let options = WebMcpOptions {
+        // 1. Expose global window object (e.g. window.__my_app_mcp)
+        global_name: Some("__my_app_mcp".to_string()),
+        // 2. Hook called right after tool dispatch to wake the host's render loop
+        on_call: Some(Rc::new(|| {
+            // e.g. event_loop_proxy.send_event(());
+        })),
+        // 3. Timeout for pending async operations before timing out
+        timeout: Duration::from_secs(10),
+    };
+
+    let installed = install(engine, options).expect("Failed to initialize WebMCP");
+    println!(
+        "WebMCP available: {}, registered {} tools",
+        installed.model_context, installed.registered
+    );
+}
+```
+
+#### Behavioral Details & Harness Testing
+
+- **Context discovery**: `install` searches `document.modelContext` followed by `navigator.modelContext`. If neither is found or `registerTool` is missing, `installed.model_context` is `false` without failing.
+- **Global object**: When `global_name` is set, `window[name]` exposes `listTools()`, `callTool(name, args)`, `listResources()`, and `readResource(uri)`.
+- **AnimationFrame queue**: Pending results yield control using `requestAnimationFrame`. Note that in background tabs where the browser suspends animation frames, tool waiting also pauses until the tab is focused.
+- **Verification**: In-browser execution cannot be tested in `agent-doc`'s own CI environment; host applications (e.g. Karakuri's browser harness) should verify end-to-end WebMCP interactions in their browser test suites.
+
 ---
 
 ## mdBook Compatibility

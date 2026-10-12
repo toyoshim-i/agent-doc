@@ -101,3 +101,29 @@ impl<T> From<T> for HandlerResult<T> {
         HandlerResult::Ready(val)
     }
 }
+
+/// Waits for a pending result to settle by repeatedly polling, yielding between attempts,
+/// and timing out if it takes too long.
+pub async fn poll_until_settled<T, F, Fut, Now>(
+    pending: &mut dyn PendingResult<T>,
+    timeout: std::time::Duration,
+    mut yield_frame: F,
+    mut now: Now,
+) -> Result<T, String>
+where
+    F: FnMut() -> Fut,
+    Fut: std::future::Future<Output = ()>,
+    Now: FnMut() -> std::time::Duration,
+{
+    let start = now();
+    loop {
+        if let Some(res) = pending.poll_settled() {
+            return Ok(res);
+        }
+        let current = now();
+        if current.saturating_sub(start) >= timeout {
+            return Err("MCP tool execution timed out waiting for the render loop".to_string());
+        }
+        yield_frame().await;
+    }
+}

@@ -9,6 +9,9 @@ pub mod build;
 #[cfg(feature = "mcp")]
 pub mod mcp;
 
+#[cfg(all(feature = "webmcp", target_arch = "wasm32"))]
+pub use mcp::webmcp;
+
 pub use index::DocIndex;
 pub use model::{
     default_categories, BrokenLink, CategoryConfig, CodeBlock, DocPage, DocSection, RenderMode,
