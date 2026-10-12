@@ -127,7 +127,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     #[cfg(feature = "mcp-http")]
     if std::env::args().any(|a| a == "--mcp-http") {
-        return engine.serve_http("127.0.0.1:8080").map_err(Into::into);
+        let server = engine.serve_http("127.0.0.1:8080")?;
+        println!("Serving MCP HTTP at {}", server.local_addr());
+        let _ = server.join();
+        return Ok(());
     }
 
     // 3. Direct JSON-RPC Dispatch (In-Process / WebMCP)

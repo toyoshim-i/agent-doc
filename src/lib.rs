@@ -719,9 +719,12 @@ impl DocEngine {
         mcp::stdio::serve_stdio_io(self, reader, writer)
     }
 
-    /// Serve MCP JSON-RPC protocol over HTTP loopback.
+    /// Serve MCP JSON-RPC protocol over HTTP loopback, returning an `HttpServer` handle.
     #[cfg(feature = "mcp-http")]
-    pub fn serve_http(&self, addr: impl std::net::ToSocketAddrs) -> std::io::Result<()> {
+    pub fn serve_http(
+        &self,
+        addr: impl std::net::ToSocketAddrs,
+    ) -> std::io::Result<mcp::http::HttpServer> {
         mcp::http::serve_http(self, addr)
     }
 

@@ -74,7 +74,7 @@ impl ToolResult {
 }
 
 /// Asynchronous or delayed result support (e.g. for Karakuri rendering/pending tools).
-pub trait PendingResult<T>: Send + Sync {
+pub trait PendingResult<T>: Send {
     /// Non-blocking check for result readiness.
     fn poll_settled(&mut self) -> Option<T>;
 
