@@ -104,7 +104,6 @@ Identity missing rule.
 
     // Without AGENT_MAN_BLESS, mismatched content fails
     std::env::remove_var("AGENT_MAN_BLESS");
-    std::env::remove_var("AGENT_DOC_BLESS");
     let res = engine.assert_or_bless(&temp_file, "new content");
     assert!(res.is_err());
 

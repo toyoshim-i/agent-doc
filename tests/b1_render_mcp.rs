@@ -65,4 +65,45 @@ Problem description.
         "Must contain section parameter for anchor link: {}",
         rendered
     );
+
+    // Verify H1 deduplication when body starts with H1
+    let mcp_h1_count = rendered.matches("# Principles").count();
+    assert_eq!(
+        mcp_h1_count, 1,
+        "RenderMode::Mcp must not duplicate H1 heading: {}",
+        rendered
+    );
+
+    let agent_rendered = engine.explain("principles", RenderMode::Agent).unwrap();
+    let agent_h1_count = agent_rendered.matches("# Principles").count();
+    assert_eq!(
+        agent_h1_count, 1,
+        "RenderMode::Agent must not duplicate H1 heading: {}",
+        agent_rendered
+    );
+
+    // Verify title is prepended when body does not start with H1
+    engine.add_page(
+        "docs/rules/no_h1.md",
+        r#"---
+id: no-h1
+title: Without Heading
+summary: A page without H1
+category: rule
+---
+Body text without an H1 heading.
+"#,
+    );
+    let rendered_no_h1_mcp = engine.explain("no-h1", RenderMode::Mcp).unwrap();
+    assert!(
+        rendered_no_h1_mcp.starts_with("# Without Heading"),
+        "Must prepend title when body has no H1: {}",
+        rendered_no_h1_mcp
+    );
+    let rendered_no_h1_agent = engine.explain("no-h1", RenderMode::Agent).unwrap();
+    assert!(
+        rendered_no_h1_agent.starts_with("# Without Heading"),
+        "Must prepend title when body has no H1: {}",
+        rendered_no_h1_agent
+    );
 }

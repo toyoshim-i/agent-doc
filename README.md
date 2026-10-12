@@ -69,7 +69,7 @@ Dumping massive prompt files or skill definitions into LLM contexts causes promp
 // build.rs
 fn main() {
     #[cfg(feature = "build")]
-    agent_man::build::embed("docs", "agent_man_pages.rs");
+    agent_man::build::embed("docs");
 }
 ```
 

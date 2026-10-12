@@ -38,7 +38,7 @@ Details for rule two.
     let read_res = engine.mcp_read_resource("kinema://doc/principles").unwrap();
     assert_eq!(read_res.uri, "kinema://doc/principles");
     assert_eq!(read_res.mime_type, "text/markdown");
-    assert!(read_res.text.contains("# Core Design Principles"));
+    assert!(read_res.text.contains("# Principles"));
 
     // 3. Built-in tool: doc_list
     let doc_list_res = engine.mcp_call_tool("doc_list", json!({})).unwrap();

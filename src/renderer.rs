@@ -41,7 +41,9 @@ impl<'a> DocRenderer<'a> {
 
     fn render_agent(&self, page: &DocPage) -> String {
         let mut out = String::new();
-        out.push_str(&format!("# {}\n\n", page.title));
+        if !starts_with_h1(&page.raw_content) {
+            out.push_str(&format!("# {}\n\n", page.title));
+        }
         if !page.summary.is_empty() {
             out.push_str(&format!("{}\n\n", page.summary));
         }
@@ -55,7 +57,9 @@ impl<'a> DocRenderer<'a> {
 
     fn render_mcp(&self, page: &DocPage) -> String {
         let mut out = String::new();
-        out.push_str(&format!("# {}\n\n", page.title));
+        if !starts_with_h1(&page.raw_content) {
+            out.push_str(&format!("# {}\n\n", page.title));
+        }
         if !page.summary.is_empty() {
             out.push_str(&format!("{}\n\n", page.summary));
         }
@@ -219,4 +223,15 @@ impl<'a> DocRenderer<'a> {
             }
         }
     }
+}
+
+fn starts_with_h1(content: &str) -> bool {
+    for line in content.lines() {
+        let trimmed = line.trim();
+        if trimmed.is_empty() {
+            continue;
+        }
+        return trimmed.starts_with("# ") || trimmed == "#";
+    }
+    false
 }

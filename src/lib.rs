@@ -904,11 +904,9 @@ fn clean_doc_path(path: &str) -> &str {
 }
 
 /// Compare content against an on-disk file, or update it when `AGENT_MAN_BLESS=1` or `AGENT_MAN_BLESS=true`.
-/// Also supports legacy `AGENT_DOC_BLESS=1` for backward compatibility.
 pub fn assert_or_bless(file_path: impl AsRef<std::path::Path>, actual: &str) -> Result<(), String> {
     let path = file_path.as_ref();
     let bless = std::env::var("AGENT_MAN_BLESS")
-        .or_else(|_| std::env::var("AGENT_DOC_BLESS"))
         .map(|v| v == "1" || v.eq_ignore_ascii_case("true"))
         .unwrap_or(false);
 
