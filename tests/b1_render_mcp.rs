@@ -106,4 +106,31 @@ Body text without an H1 heading.
         "Must prepend title when body has no H1: {}",
         rendered_no_h1_agent
     );
+
+    // Verify summary is placed immediately after H1 heading when body starts with H1
+    engine.add_page(
+        "docs/guides/spec.md",
+        r#"---
+id: spec
+title: Spec
+summary: The summary.
+category: guide
+---
+# Spec (v0.2)
+
+Body text of the spec.
+"#,
+    );
+    let spec_rendered = engine.explain("spec", RenderMode::Agent).unwrap();
+    assert!(
+        spec_rendered.starts_with("# Spec (v0.2)\n\nThe summary.\n\nBody text"),
+        "Summary must be placed immediately after H1 heading: {}",
+        spec_rendered
+    );
+    let spec_mcp = engine.explain("spec", RenderMode::Mcp).unwrap();
+    assert!(
+        spec_mcp.starts_with("# Spec (v0.2)\n\nThe summary.\n\nBody text"),
+        "Summary must be placed immediately after H1 heading in Mcp mode: {}",
+        spec_mcp
+    );
 }

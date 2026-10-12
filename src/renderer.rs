@@ -40,35 +40,67 @@ impl<'a> DocRenderer<'a> {
     }
 
     fn render_agent(&self, page: &DocPage) -> String {
-        let mut out = String::new();
-        if !starts_with_h1(&page.raw_content) {
-            out.push_str(&format!("# {}\n\n", page.title));
-        }
-        if !page.summary.is_empty() {
-            out.push_str(&format!("{}\n\n", page.summary));
-        }
-
-        let body_rewritten = self.rewrite_links(&page.path, &page.raw_content, RenderMode::Agent);
-        out.push_str(&body_rewritten);
-        out.push('\n');
-
-        out
+        self.render_markdown(page, RenderMode::Agent)
     }
 
     fn render_mcp(&self, page: &DocPage) -> String {
-        let mut out = String::new();
+        self.render_markdown(page, RenderMode::Mcp)
+    }
+
+    fn render_markdown(&self, page: &DocPage, mode: RenderMode) -> String {
+        let body_rewritten = self.rewrite_links(&page.path, &page.raw_content, mode);
+        let has_fm_summary = has_frontmatter_summary(&page.source_content);
+        let summary = page.summary.trim();
+
         if !starts_with_h1(&page.raw_content) {
+            let mut out = String::new();
             out.push_str(&format!("# {}\n\n", page.title));
+            if has_fm_summary && !summary.is_empty() {
+                out.push_str(summary);
+                out.push_str("\n\n");
+            }
+            out.push_str(&body_rewritten);
+            out.push('\n');
+            out
+        } else if has_fm_summary && !summary.is_empty() {
+            // Body starts with H1 heading: place summary immediately after the H1 heading
+            let lines: Vec<&str> = body_rewritten.lines().collect();
+            if let Some(h1_idx) = lines.iter().position(|l| {
+                let trimmed = l.trim();
+                trimmed.starts_with("# ") || trimmed == "#"
+            }) {
+                let rest = lines[h1_idx + 1..].join("\n");
+                if rest.trim_start().starts_with(summary) {
+                    let mut out = body_rewritten;
+                    out.push('\n');
+                    out
+                } else {
+                    let mut out = String::new();
+                    for line in &lines[..=h1_idx] {
+                        out.push_str(line);
+                        out.push('\n');
+                    }
+                    out.push('\n');
+                    out.push_str(summary);
+                    out.push('\n');
+                    let rest_trimmed = rest.trim_start_matches('\n');
+                    if !rest_trimmed.is_empty() {
+                        out.push('\n');
+                        out.push_str(rest_trimmed);
+                        out.push('\n');
+                    }
+                    out
+                }
+            } else {
+                let mut out = body_rewritten;
+                out.push('\n');
+                out
+            }
+        } else {
+            let mut out = body_rewritten;
+            out.push('\n');
+            out
         }
-        if !page.summary.is_empty() {
-            out.push_str(&format!("{}\n\n", page.summary));
-        }
-
-        let body_rewritten = self.rewrite_links(&page.path, &page.raw_content, RenderMode::Mcp);
-        out.push_str(&body_rewritten);
-        out.push('\n');
-
-        out
     }
 
     fn render_terminal(&self, page: &DocPage) -> String {
@@ -232,6 +264,24 @@ fn starts_with_h1(content: &str) -> bool {
             continue;
         }
         return trimmed.starts_with("# ") || trimmed == "#";
+    }
+    false
+}
+
+fn has_frontmatter_summary(source: &str) -> bool {
+    let lines: Vec<&str> = source.lines().collect();
+    if lines.first().map(|l| l.trim()) == Some("---") {
+        for line in lines.iter().skip(1) {
+            let trimmed = line.trim();
+            if trimmed == "---" {
+                break;
+            }
+            if let Some((k, _)) = trimmed.split_once(':') {
+                if k.trim().eq_ignore_ascii_case("summary") {
+                    return true;
+                }
+            }
+        }
     }
     false
 }
