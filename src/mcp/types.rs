@@ -71,6 +71,14 @@ impl ToolResult {
             is_error: false,
         }
     }
+
+    pub fn error_structured(text: impl Into<String>, data: serde_json::Value) -> Self {
+        Self {
+            content: vec![ToolContent::text(text)],
+            structured_content: Some(data),
+            is_error: true,
+        }
+    }
 }
 
 /// Asynchronous or delayed result support (e.g. for Karakuri rendering/pending tools).

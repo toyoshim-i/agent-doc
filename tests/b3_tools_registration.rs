@@ -136,4 +136,20 @@ Details.
     let issues = engine.check_tools();
     assert!(!issues.is_empty(), "Must detect nonexistent .see reference");
     assert!(issues.iter().any(|i| i.contains("nonexistent-page-id")));
+
+    // 5. Acceptance condition: ToolResult::error_structured serializes with both isError: true and structuredContent
+    let err_structured = agent_doc::mcp::ToolResult::error_structured(
+        "Refused due to rule violation",
+        json!({
+            "code": "REFUSAL_UNWIRED",
+            "message": "Unwired net found"
+        }),
+    );
+    let serialized = serde_json::to_value(&err_structured).unwrap();
+    assert_eq!(serialized["isError"], true);
+    assert_eq!(serialized["structuredContent"]["code"], "REFUSAL_UNWIRED");
+    assert_eq!(
+        serialized["content"][0]["text"],
+        "Refused due to rule violation"
+    );
 }
