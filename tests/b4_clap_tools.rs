@@ -129,6 +129,10 @@ fn test_b4_clap_tools_acceptance() {
             deny_warnings: bool,
             #[arg(long, default_value_t = true, action = ArgAction::SetFalse)]
             cache: bool,
+            #[arg(long = "no-color", default_value_t = true, action = ArgAction::SetFalse)]
+            color: bool,
+            #[arg(long = "no-headers", default_value_t = true, action = ArgAction::SetFalse)]
+            show_headers: bool,
             files: Vec<String>,
         },
     }
@@ -141,22 +145,49 @@ fn test_b4_clap_tools_acceptance() {
                 DeriveCommands::Lint {
                     deny_warnings,
                     cache,
+                    color,
+                    show_headers,
                     files,
                 } => agent_doc::mcp::ToolResult::text(format!(
-                    "Linted: deny={deny_warnings}, cache={cache}, files={files:?}"
+                    "Linted: deny={deny_warnings}, cache={cache}, color={color}, headers={show_headers}, files={files:?}"
                 ))
                 .into(),
             }
         })
         .unwrap();
 
-    // Call lint with deny_warnings=true, cache=false, files=["-", "-v"]
+    // Verify schema uses field name ("color", "show_headers") rather than flag name ("no-color", "no-headers")
+    let tools = derive_engine.mcp_list_tools();
+    let lint_tool = tools.iter().find(|t| t.name == "lint").unwrap();
+    assert!(
+        lint_tool.input_schema["properties"].get("color").is_some(),
+        "input_schema should contain field name 'color': {:?}",
+        lint_tool.input_schema
+    );
+    assert!(
+        lint_tool.input_schema["properties"]
+            .get("no-color")
+            .is_none(),
+        "input_schema should not contain flag name 'no-color': {:?}",
+        lint_tool.input_schema
+    );
+    assert!(
+        lint_tool.input_schema["properties"]
+            .get("show_headers")
+            .is_some(),
+        "input_schema should contain field name 'show_headers': {:?}",
+        lint_tool.input_schema
+    );
+
+    // Call lint with deny_warnings=true, cache=false, color=false, show-headers=false (kebab-case)
     let derive_call = derive_engine
         .mcp_call_tool(
             "lint",
             json!({
                 "deny_warnings": true,
                 "cache": false,
+                "color": false,
+                "show-headers": false,
                 "files": ["-", "-v"]
             }),
         )
@@ -168,6 +199,21 @@ fn test_b4_clap_tools_acceptance() {
     );
     assert_eq!(
         derive_call.content[0].text,
-        "Linted: deny=true, cache=false, files=[\"-\", \"-v\"]"
+        "Linted: deny=true, cache=false, color=false, headers=false, files=[\"-\", \"-v\"]"
     );
+
+    // Call lint with color=true and show_headers=true
+    let color_true_call = derive_engine
+        .mcp_call_tool(
+            "lint",
+            json!({
+                "color": true,
+                "show_headers": true
+            }),
+        )
+        .unwrap();
+    assert!(!color_true_call.is_error);
+    assert!(color_true_call.content[0]
+        .text
+        .contains("color=true, headers=true"));
 }

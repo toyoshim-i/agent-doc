@@ -54,7 +54,20 @@ where
                 continue;
             }
 
-            let param_name = if let Some(long) = arg.get_long() {
+            let is_set_false = matches!(arg.get_action(), ArgAction::SetFalse);
+            let param_name = if is_set_false {
+                let id = arg_id.to_string();
+                if let Some(long) = arg.get_long() {
+                    flag_map.insert(id.clone(), format!("--{long}"));
+                    flag_map.insert(id.replace('_', "-"), format!("--{long}"));
+                } else if let Some(short) = arg.get_short() {
+                    flag_map.insert(id.clone(), format!("-{short}"));
+                    flag_map.insert(id.replace('_', "-"), format!("-{short}"));
+                }
+                set_false_flags.insert(id.clone());
+                set_false_flags.insert(id.replace('_', "-"));
+                id
+            } else if let Some(long) = arg.get_long() {
                 flag_map.insert(long.to_string(), format!("--{long}"));
                 flag_map.insert(arg_id.to_string(), format!("--{long}"));
                 let kebab = arg_id.replace('_', "-");
@@ -69,13 +82,6 @@ where
                 positional_order.push(arg_id.to_string());
                 arg_id.to_string()
             };
-
-            if matches!(arg.get_action(), ArgAction::SetFalse) {
-                set_false_flags.insert(param_name.clone());
-                set_false_flags.insert(arg_id.to_string());
-                set_false_flags.insert(arg_id.replace('_', "-"));
-                set_false_flags.insert(param_name.replace('-', "_"));
-            }
 
             let desc = arg.get_help().map(|h| h.to_string()).unwrap_or_default();
             let required = arg.is_required_set();
