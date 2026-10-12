@@ -18,7 +18,7 @@ Dumping massive prompt files or skill definitions into LLM contexts causes promp
 `agent-doc` enables **context-engineering-free** design:
 1. **Self-Evident Discovery**: CLI `--help` points agents directly to your in-binary guide (`mycli guide`).
 2. **Just-in-Time Knowledge**: Agents retrieve specific topics (`mycli guide <topic>`) only when relevant, keeping working contexts clean.
-3. **Automated Diagnostic Remediation**: Diagnostics emit self-documenting hints (`Help: run 'mycli explain <code>'`). Agents run the command to receive actionable root-cause analysis and code fixes.
+3. **Automated Diagnostic Remediation**: Diagnostics emit self-documenting hints (`Help: run 'mycli explain <code>'` or `Help: call tool 'doc_read {"id": "<code>"}'`). Agents or MCP clients receive actionable root-cause analysis and code fixes.
 4. **Unified MCP & CLI**: Tools and documentation are served over standard MCP (stdio, HTTP, and in-process) with identical input schemas and validation.
 
 ---
@@ -116,8 +116,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // 1. CLI Guide and Diagnostics Explain
     println!("{}", engine.guide(None, RenderMode::Terminal)?);
-    println!("{}", engine.explain("E001", RenderMode::Agent)?);
-    println!("{}", engine.hint("E001")); // "Help: run 'kinema explain E001'"
+    println!("{}", engine.hint("E001", RenderMode::Agent).unwrap()); // "Help: run 'kinema explain E001'"
+    println!("{}", engine.hint("E001", RenderMode::Mcp).unwrap());   // "Help: call tool 'doc_read {\"id\": \"E001\"}'"
 
     // 2. MCP Server (stdio or HTTP)
     #[cfg(feature = "mcp-stdio")]

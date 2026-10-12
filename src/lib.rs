@@ -107,13 +107,21 @@ impl DocEngine {
         self.index.list_topics(category)
     }
 
-    /// Return remediation hint command if the diagnostic code/rule exists.
-    pub fn hint(&self, code: &str) -> Option<String> {
-        self.index.lookup_exact(code).map(|page| {
-            format!(
-                "Help: run '{} {} {}'",
-                self.binary_name, self.explain_subcommand, page.id
-            )
+    /// Return remediation hint command or MCP tool invocation if the diagnostic code/rule exists.
+    pub fn hint(&self, code: &str, mode: RenderMode) -> Option<String> {
+        self.index.lookup_exact(code).map(|page| match mode {
+            RenderMode::Mcp => {
+                format!("Help: call tool 'doc_read {{\"id\": \"{}\"}}'", page.id)
+            }
+            RenderMode::Agent | RenderMode::Terminal => {
+                format!(
+                    "Help: run '{} {} {}'",
+                    self.binary_name, self.explain_subcommand, page.id
+                )
+            }
+            RenderMode::Json => {
+                format!("doc_read {{\"id\": \"{}\"}}", page.id)
+            }
         })
     }
 

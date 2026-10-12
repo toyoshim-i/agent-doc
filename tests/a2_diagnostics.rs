@@ -31,18 +31,42 @@ Separate nets.
 "#,
     );
 
-    // 1. engine.hint() returns helpful command for existing code/alias
-    let hint1 = engine.hint("E001");
-    assert_eq!(hint1, Some("Help: run 'kinema explain E001'".to_string()));
+    // 1. engine.hint() returns helpful command / tool guidance for existing code/alias
+    let hint_agent = engine.hint("E001", RenderMode::Agent);
+    assert_eq!(
+        hint_agent,
+        Some("Help: run 'kinema explain E001'".to_string())
+    );
 
-    let hint_alias = engine.hint("unused-pin");
+    let hint_terminal = engine.hint("E001", RenderMode::Terminal);
+    assert_eq!(
+        hint_terminal,
+        Some("Help: run 'kinema explain E001'".to_string())
+    );
+
+    let hint_mcp = engine.hint("E001", RenderMode::Mcp);
+    assert_eq!(
+        hint_mcp,
+        Some("Help: call tool 'doc_read {\"id\": \"E001\"}'".to_string())
+    );
+
+    let hint_alias = engine.hint("unused-pin", RenderMode::Agent);
     assert_eq!(
         hint_alias,
         Some("Help: run 'kinema explain E001'".to_string())
     );
 
+    let hint_alias_mcp = engine.hint("unused-pin", RenderMode::Mcp);
+    assert_eq!(
+        hint_alias_mcp,
+        Some("Help: call tool 'doc_read {\"id\": \"E001\"}'".to_string())
+    );
+
+    let hint_json = engine.hint("E001", RenderMode::Json);
+    assert_eq!(hint_json, Some("doc_read {\"id\": \"E001\"}".to_string()));
+
     // Missing code returns None
-    assert_eq!(engine.hint("E999"), None);
+    assert_eq!(engine.hint("E999", RenderMode::Mcp), None);
 
     // 2. Acceptance condition: Non-existing code with partial match in another page
     // E001 matches "E00", but explain for "E00" or "E0" should return NotFound, not E001!
