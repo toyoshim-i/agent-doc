@@ -76,7 +76,7 @@ Details.
         )
         .unwrap();
     assert!(!valid_call.is_error);
-    assert!(valid_call.content[0].text.contains("Configured pin P1"));
+    assert!(valid_call.text_content().contains("Configured pin P1"));
 
     // 2b. Acceptance condition: misspelled/unknown optional argument is rejected
     let unknown_arg_call = engine
@@ -89,7 +89,7 @@ Details.
         unknown_arg_call.is_error,
         "Unknown/misspelled argument must be rejected with isError"
     );
-    let unknown_err_msg = &unknown_arg_call.content[0].text;
+    let unknown_err_msg = unknown_arg_call.text_content();
     assert!(
         unknown_err_msg.contains("pulll"),
         "Must specify unknown argument: {}",
@@ -114,7 +114,7 @@ Details.
         )
         .unwrap();
     assert!(invalid_call.is_error, "Should fail validation");
-    let err_msg = &invalid_call.content[0].text;
+    let err_msg = invalid_call.text_content();
     assert!(
         err_msg.contains("mode"),
         "Must specify which arg failed: {}",

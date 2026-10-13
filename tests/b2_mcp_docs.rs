@@ -43,7 +43,7 @@ Details for rule two.
     // 3. Built-in tool: doc_list
     let doc_list_res = engine.mcp_call_tool("doc_list", json!({})).unwrap();
     assert!(!doc_list_res.is_error);
-    let list_text = &doc_list_res.content[0].text;
+    let list_text = doc_list_res.text_content();
     assert!(list_text.contains("principles"));
     assert!(list_text.contains("Core Design Principles"));
 
@@ -52,8 +52,8 @@ Details for rule two.
         .mcp_call_tool("doc_read", json!({ "id": "principles" }))
         .unwrap();
     assert!(!doc_read_all.is_error);
-    assert!(doc_read_all.content[0].text.contains("Rule One"));
-    assert!(doc_read_all.content[0].text.contains("Rule Two"));
+    assert!(doc_read_all.text_content().contains("Rule One"));
+    assert!(doc_read_all.text_content().contains("Rule Two"));
 
     // 5. Built-in tool: doc_read (single section by anchor)
     let doc_read_section = engine
@@ -63,9 +63,9 @@ Details for rule two.
         )
         .unwrap();
     assert!(!doc_read_section.is_error);
-    assert!(doc_read_section.content[0].text.contains("Rule One"));
+    assert!(doc_read_section.text_content().contains("Rule One"));
     assert!(
-        !doc_read_section.content[0].text.contains("Rule Two"),
+        !doc_read_section.text_content().contains("Rule Two"),
         "Should only return requested section"
     );
 

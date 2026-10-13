@@ -92,8 +92,8 @@ fn test_b4_clap_tools_acceptance() {
         )
         .unwrap();
     assert!(!valid_call.is_error);
-    assert!(valid_call.content[0]
-        .text
+    assert!(valid_call
+        .text_content()
         .contains("Ran check on board.v (strict: true, files: [\"examples/timer_core.v\", \"examples/sub.v\"])"));
 
     // 3. Acceptance condition: Clap parser rejects invalid input identically to CLI
@@ -107,8 +107,8 @@ fn test_b4_clap_tools_acceptance() {
         )
         .unwrap();
     assert!(invalid_call.is_error);
-    assert!(invalid_call.content[0]
-        .text
+    assert!(invalid_call
+        .text_content()
         .contains("invalid value 'invalid_format'"));
 
     // 4. Acceptance condition (Item 5 & 6): derive-based CLI from_arg_matches works on root ArgMatches
@@ -198,7 +198,7 @@ fn test_b4_clap_tools_acceptance() {
         derive_call
     );
     assert_eq!(
-        derive_call.content[0].text,
+        derive_call.text_content(),
         "Linted: deny=true, cache=false, color=false, headers=false, files=[\"-\", \"-v\"]"
     );
 
@@ -213,7 +213,7 @@ fn test_b4_clap_tools_acceptance() {
         )
         .unwrap();
     assert!(!color_true_call.is_error);
-    assert!(color_true_call.content[0]
-        .text
+    assert!(color_true_call
+        .text_content()
         .contains("color=true, headers=true"));
 }

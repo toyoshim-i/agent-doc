@@ -230,6 +230,47 @@ In your browser initialization:
 - **AnimationFrame queue**: Pending results yield control using `requestAnimationFrame`. Note that in background tabs where the browser suspends animation frames, tool waiting also pauses until the tab is focused.
 - **Verification**: In-browser execution cannot be tested in `agent-man`'s own CI environment; host applications (e.g. Karakuri's browser harness) should verify end-to-end WebMCP interactions in their browser test suites.
 
+### 5. Returning Images from Tools (MCP Image Content)
+
+Tools can return images conforming to the MCP image content specification (`{"type": "image", "data": "<base64>", "mimeType": "<mime>"}`):
+
+```rust
+use agent_man::mcp::{Tool, ToolResult};
+
+engine.register_tool(
+    Tool::builder("render_slot", "Render a visual shader slot to an image")
+        .build(),
+    |_args| {
+        let png_base64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
+        // Return a combined descriptive text and image:
+        ToolResult::text_and_image("Rendered slot preview:", png_base64, "image/png").into()
+        // Or image-only:
+        // ToolResult::image(png_base64, "image/png").into()
+    },
+)?;
+```
+
+> **Note on Token Usage & Client Compatibility:**
+> - Images consume a substantial number of tokens when fed into multimodal LLMs. Host applications should enforce reasonable limits on image resolution and dimensions.
+> - Supported image formats (such as `image/png`, `image/jpeg`, `image/webp`) vary by MCP client and upstream model provider.
+
+---
+
+## Breaking Changes in v0.5.0
+
+`agent-man` v0.5.0 upgrades MCP content representation to support multimodal image outputs:
+
+- **`ToolContent` is now an enum**: Previously `ToolContent` was a struct with `content_type` and `text`. It is now an enum:
+  ```rust
+  pub enum ToolContent {
+      Text { text: String },
+      Image { data: String, mime_type: String },
+  }
+  ```
+- **Direct field access replacement**: Existing code accessing `content[0].text` or iterating over `content` should use:
+  - `tool_content.as_text() -> Option<&str>` to inspect text of an individual item.
+  - `tool_result.text_content() -> String` to obtain all text elements joined with `\n` (skipping images).
+
 ---
 
 ## mdBook Compatibility
@@ -241,3 +282,4 @@ If your project builds a web manual using [mdBook](https://rust-lang.github.io/m
 ## License
 
 MIT OR Apache-2.0
+
