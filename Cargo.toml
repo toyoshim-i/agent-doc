@@ -1,6 +1,6 @@
 [package]
 name = "agent-man"
-version = "0.5.0"
+version = "0.5.1"
 edition = "2021"
 authors = ["Takashi Toyoshima <toyoshim@gmail.com>"]
 license = "MIT OR Apache-2.0"
@@ -17,6 +17,7 @@ mcp = []
 mcp-stdio = ["mcp"]
 mcp-http = ["mcp"]
 clap = ["dep:clap", "mcp"]
+cli = ["clap", "clap/derive", "mcp-stdio", "mcp-http"]
 webmcp = [
     "mcp",
     "dep:wasm-bindgen",
@@ -24,6 +25,11 @@ webmcp = [
     "dep:web-sys",
     "dep:wasm-bindgen-futures",
 ]
+
+[[bin]]
+name = "agent-man-cli"
+path = "src/bin/agent-man-cli.rs"
+required-features = ["cli"]
 
 [dependencies]
 serde = { version = "1.0", features = ["derive"] }

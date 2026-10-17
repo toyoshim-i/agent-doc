@@ -165,6 +165,97 @@ impl DocIndex {
             })
             .collect()
     }
+
+    /// Return all pages that contain an internal link resolving to `target_id`.
+    pub fn backlinks(&self, target_id: &str) -> Vec<&DocPage> {
+        let mut refs = Vec::new();
+        for page in &self.pages {
+            if page.id.eq_ignore_ascii_case(target_id) {
+                continue;
+            }
+            let links = extract_markdown_links(&page.source_content);
+            let links_to_target = links.into_iter().any(|(_line, _label, target)| {
+                if target.starts_with("http://")
+                    || target.starts_with("https://")
+                    || target.starts_with("mailto:")
+                {
+                    return false;
+                }
+                if let Some(resolved) = self.resolve_link(&page.path, &target) {
+                    resolved.target_id.eq_ignore_ascii_case(target_id)
+                } else {
+                    false
+                }
+            });
+            if links_to_target {
+                refs.push(page);
+            }
+        }
+        refs
+    }
+}
+
+/// Extract markdown links `(line_num_1_indexed, label, target)` outside fenced code blocks.
+pub fn extract_markdown_links(content: &str) -> Vec<(usize, String, String)> {
+    let mut links = Vec::new();
+    let mut in_fence = false;
+
+    for (idx, line) in content.lines().enumerate() {
+        let line_num = idx + 1;
+        let trimmed = line.trim();
+        if trimmed.starts_with("```") {
+            in_fence = !in_fence;
+            continue;
+        }
+        if in_fence {
+            continue;
+        }
+
+        let chars: Vec<char> = line.chars().collect();
+        let len = chars.len();
+        let mut i = 0;
+
+        while i < len {
+            if chars[i] == '[' {
+                let start_label = i + 1;
+                let mut label_end = None;
+                let mut j = start_label;
+                while j < len {
+                    if chars[j] == ']' {
+                        label_end = Some(j);
+                        break;
+                    }
+                    j += 1;
+                }
+
+                if let Some(lend) = label_end {
+                    if lend + 1 < len && chars[lend + 1] == '(' {
+                        let start_target = lend + 2;
+                        let mut target_end = None;
+                        let mut k = start_target;
+                        while k < len {
+                            if chars[k] == ')' {
+                                target_end = Some(k);
+                                break;
+                            }
+                            k += 1;
+                        }
+
+                        if let Some(tend) = target_end {
+                            let label: String = chars[start_label..lend].iter().collect();
+                            let target: String = chars[start_target..tend].iter().collect();
+                            links.push((line_num, label, target));
+                            i = tend + 1;
+                            continue;
+                        }
+                    }
+                }
+            }
+            i += 1;
+        }
+    }
+
+    links
 }
 
 fn normalize_path_str(p: &str) -> String {

@@ -1,0 +1,64 @@
+{
+  "name": "agent-man Documentation",
+  "description": "Context-engineering-free documentation, MCP engine, and affordance-driven workspace proxy",
+  "categories": [
+    {
+      "key": "entrypoint",
+      "heading": "Entrypoints (Must Read)",
+      "visibility": "pinned",
+      "default_access": "readonly"
+    },
+    {
+      "key": "guide",
+      "heading": "Guides & Architecture",
+      "visibility": "normal",
+      "default_access": "readwrite"
+    },
+    {
+      "key": "rule",
+      "heading": "Diagnostics & Rules",
+      "visibility": "normal",
+      "default_access": "readonly"
+    },
+    {
+      "key": "record",
+      "heading": "Records & History",
+      "visibility": "folded",
+      "default_access": "readwrite"
+    }
+  ],
+  "pages": [
+    {
+      "id": "overview",
+      "path": "overview.md",
+      "title": "agent-man Overview",
+      "summary": "Core philosophy and architecture of agent-man (embedded library and dynamic workspace CLI).",
+      "category": "entrypoint",
+      "access": "readonly"
+    },
+    {
+      "id": "embedding",
+      "path": "guides/embedding.md",
+      "title": "Embedding Guide",
+      "summary": "Compile-time embedding, DocEngine configuration, MCP servers, and WebMCP integration.",
+      "category": "guide",
+      "access": "readwrite"
+    },
+    {
+      "id": "cli-workspace",
+      "path": "guides/cli-workspace.md",
+      "title": "CLI & Workspace Guide",
+      "summary": "Using agent-man-cli as a dynamic Markdown browser, MCP server, and line-range editing proxy.",
+      "category": "guide",
+      "access": "readwrite"
+    },
+    {
+      "id": "v0.5.0-image-content",
+      "path": "records/v0.5.0-image-content.md",
+      "title": "ADR: Multimodal Image Content in v0.5.0",
+      "summary": "Architectural decision record for multimodal ToolContent::Image support in MCP responses.",
+      "category": "record",
+      "access": "readonly"
+    }
+  ]
+}

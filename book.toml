@@ -1,0 +1,16 @@
+[book]
+authors = ["Takashi Toyoshima"]
+language = "en"
+src = "docs"
+title = "agent-man Documentation"
+
+[build]
+build-dir = "target/book"
+
+[output.html]
+git-repository-url = "https://github.com/toyoshim-i/agent-man"
+edit-url-template = "https://github.com/toyoshim-i/agent-man/edit/main/docs/{path}"
+site-url = "/agent-man/"
+
+[preprocessor.frontmatter]
+command = "python3 scripts/strip_frontmatter.py"

@@ -57,6 +57,7 @@ Dumping massive prompt files or skill definitions into LLM contexts causes promp
 | `mcp-stdio` | MCP standard input/output transport (`serve_stdio()`) | `mcp` |
 | `mcp-http` | MCP HTTP POST loopback transport (`serve_http()`) using `std::net` | `mcp` |
 | `clap` | Auto-generate MCP tools from `clap::Command` subcommands | `mcp`, `clap` |
+| `cli` | Build the bundled `agent-man-cli` workspace browser, MCP server, and editing proxy | `clap`, `mcp-stdio`, `mcp-http` |
 | `webmcp` | WebMCP browser integration (`install()`, `call_tool()`) for `wasm32` | `mcp`, `wasm-bindgen`, `js-sys`, `web-sys`, `wasm-bindgen-futures` |
 
 ---
@@ -273,13 +274,34 @@ engine.register_tool(
 
 ---
 
+## Bundled Tool: `agent-man-cli` & Online Manual
+
+Alongside the library, `agent-man` includes a companion CLI binary, **`agent-man-cli`** (enabled with `--features cli`), which acts as a dynamic filesystem browser, MCP server, and affordance-driven editing proxy for any local Markdown directory (`agent-man.json`).
+
+- **Online Manual (GitHub Pages)**: [https://toyoshim-i.github.io/agent-man/](https://toyoshim-i.github.io/agent-man/)
+- **Browse `agent-man`'s own docs locally**:
+  ```sh
+  cargo install agent-man --features cli
+  agent-man-cli --root docs guide
+  ```
+- **What `agent-man-cli` provides**:
+  - **Dynamic Workspace Manifest (`agent-man.json`)**: Organize local Markdown files into `pinned` entrypoints, `normal` guides, and `folded` historical records, with `readonly` / `readwrite` access control (`agent-man-cli --root <dir> init`).
+  - **Bidirectional Navigation**: Automatic incoming backlinks (`Referenced by`) on every page.
+  - **Affordance-Driven Editing Proxy**: Inspect 1-indexed line numbers (`lines`) and apply partial line-range updates (`insert`, `replace`, `delete-lines`, `create`, `meta`, `remove`) over CLI or MCP (`--mcp`, `--mcp-http`) with immediate link and orphan diagnostics.
+
+---
+
 ## mdBook Compatibility
 
-If your project builds a web manual using [mdBook](https://rust-lang.github.io/mdBook/), the included [`scripts/strip_frontmatter.py`](scripts/strip_frontmatter.py) preprocessor strips leading YAML frontmatter during `mdbook build`, allowing identical Markdown source files to power both the CLI/MCP binary and online documentation.
+If your project builds a web manual using [mdBook](https://rust-lang.github.io/mdBook/):
+
+- Generate `<root>/SUMMARY.md` from `agent-man.json` via `agent-man-cli --root docs summary --write` (or from embedded code via `engine.summary_md()`).
+- Strip leading YAML frontmatter during `mdbook build` using either `agent-man-cli mdbook-preprocessor` or the included [`scripts/strip_frontmatter.py`](scripts/strip_frontmatter.py) preprocessor.
 
 ---
 
 ## License
 
 MIT OR Apache-2.0
+
 

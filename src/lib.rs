@@ -2,6 +2,7 @@ pub mod index;
 pub mod model;
 pub mod parser;
 pub mod renderer;
+pub mod workspace;
 
 #[cfg(feature = "build")]
 pub mod build;
@@ -19,6 +20,10 @@ pub use model::{
 };
 pub use parser::parse_markdown_page;
 pub use renderer::DocRenderer;
+pub use workspace::{
+    AccessMode, CategoryVisibility, CreatePageRequest, InitReport, LintReport, PageMeta, Workspace,
+    WorkspaceCategory, WorkspaceError, WorkspaceManifest, MANIFEST_FILENAME,
+};
 
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
 pub enum DocError {
@@ -39,6 +44,8 @@ pub struct DocEngine {
     pub index: DocIndex,
     pub categories: Vec<CategoryConfig>,
     pub version: Option<String>,
+    pub workspace_root: Option<std::path::PathBuf>,
+    pub workspace_prefix: Option<String>,
     #[cfg(feature = "mcp")]
     pub tools: Vec<mcp::Tool>,
 }
@@ -54,6 +61,8 @@ impl DocEngine {
             index: DocIndex::new(),
             categories: default_categories(),
             version: None,
+            workspace_root: None,
+            workspace_prefix: None,
             #[cfg(feature = "mcp")]
             tools: Vec::new(),
         }
@@ -573,6 +582,27 @@ impl DocEngine {
     /// List all documentation pages as MCP resources (`<scheme>://doc/<id>`).
     #[cfg(feature = "mcp")]
     pub fn mcp_list_resources(&self) -> Vec<mcp::McpResource> {
+        if let Some(ref root) = self.workspace_root {
+            let prefix = self
+                .workspace_prefix
+                .as_deref()
+                .unwrap_or(&self.binary_name);
+            if let Ok(ws) = Workspace::load(root, prefix) {
+                return ws
+                    .engine
+                    .index
+                    .pages
+                    .iter()
+                    .map(|p| mcp::McpResource {
+                        uri: format!("{}://doc/{}", self.scheme, p.id),
+                        name: p.title.clone(),
+                        description: p.summary.clone(),
+                        mime_type: "text/markdown".to_string(),
+                    })
+                    .collect();
+            }
+        }
+
         self.index
             .pages
             .iter()
@@ -597,6 +627,23 @@ impl DocEngine {
             Some((i, a)) => (i, Some(a)),
             None => (without_prefix, None),
         };
+
+        if let Some(ref root) = self.workspace_root {
+            let cmd_prefix = self
+                .workspace_prefix
+                .as_deref()
+                .unwrap_or(&self.binary_name);
+            let ws = Workspace::load(root, cmd_prefix)
+                .map_err(|e| DocError::NotFound(e.to_string()))?;
+            let text = ws
+                .read_page(id, anchor, RenderMode::Mcp)
+                .map_err(|e| DocError::NotFound(e.to_string()))?;
+            return Ok(mcp::McpResourceContents {
+                uri: uri.to_string(),
+                mime_type: "text/markdown".to_string(),
+                text,
+            });
+        }
 
         let page = self
             .index
@@ -631,6 +678,24 @@ impl DocEngine {
     ) -> mcp::HandlerResult<mcp::ToolResult> {
         match name {
             "doc_list" => {
+                if let Some(ref root) = self.workspace_root {
+                    let cmd_prefix = self
+                        .workspace_prefix
+                        .as_deref()
+                        .unwrap_or(&self.binary_name);
+                    let category = args.get("category").and_then(|v| v.as_str());
+                    let include_folded = args
+                        .get("include_folded")
+                        .and_then(|v| v.as_bool())
+                        .unwrap_or(false);
+                    return match Workspace::load(root, cmd_prefix) {
+                        Ok(ws) => mcp::HandlerResult::Ready(mcp::ToolResult::text(
+                            ws.list_pages(category, include_folded, RenderMode::Mcp),
+                        )),
+                        Err(e) => mcp::HandlerResult::Ready(mcp::ToolResult::error(e.to_string())),
+                    };
+                }
+
                 let topics = self.list_topics(None);
                 let mut out = String::new();
                 for t in topics {
@@ -647,6 +712,20 @@ impl DocEngine {
                         ))
                     }
                 };
+                let section = args.get("section").and_then(|v| v.as_str());
+
+                if let Some(ref root) = self.workspace_root {
+                    let cmd_prefix = self
+                        .workspace_prefix
+                        .as_deref()
+                        .unwrap_or(&self.binary_name);
+                    return match Workspace::load(root, cmd_prefix)
+                        .and_then(|ws| ws.read_page(id, section, RenderMode::Mcp))
+                    {
+                        Ok(text) => mcp::HandlerResult::Ready(mcp::ToolResult::text(text)),
+                        Err(e) => mcp::HandlerResult::Ready(mcp::ToolResult::error(e.to_string())),
+                    };
+                }
 
                 let page = match self.index.lookup_exact(id) {
                     Some(p) => p,
@@ -657,7 +736,7 @@ impl DocEngine {
                     }
                 };
 
-                if let Some(section) = args.get("section").and_then(|v| v.as_str()) {
+                if let Some(section) = section {
                     if let Some(sec) = page.sections.iter().find(|s| {
                         s.anchor == section || crate::parser::slugify(&s.heading) == section
                     }) {
@@ -824,14 +903,32 @@ impl DocEngine {
     /// List all available MCP tools including built-in doc tools and registered host tools.
     #[cfg(feature = "mcp")]
     pub fn mcp_list_tools(&self) -> Vec<mcp::McpToolDefinition> {
+        let doc_list_schema = if self.workspace_root.is_some() {
+            serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "category": {
+                        "type": "string",
+                        "description": "Optional category key to filter or expand folded categories (e.g. 'record')"
+                    },
+                    "include_folded": {
+                        "type": "boolean",
+                        "description": "Include folded categories (such as historical records) when listing all topics"
+                    }
+                },
+            })
+        } else {
+            serde_json::json!({
+                "type": "object",
+                "properties": {},
+            })
+        };
+
         let mut list = vec![
             mcp::McpToolDefinition {
                 name: "doc_list".to_string(),
                 description: "List all available documentation topics and summaries".to_string(),
-                input_schema: serde_json::json!({
-                    "type": "object",
-                    "properties": {},
-                }),
+                input_schema: doc_list_schema,
             },
             mcp::McpToolDefinition {
                 name: "doc_read".to_string(),
