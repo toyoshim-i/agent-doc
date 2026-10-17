@@ -10,6 +10,8 @@ pub enum ParamType {
     Boolean,
     Enum(Vec<String>),
     StringArray,
+    Object,
+    Any,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -39,6 +41,8 @@ pub struct Tool {
     pub examples: Vec<serde_json::Value>,
     pub handler: ToolHandler,
     pub skip_validation: bool,
+    pub additional_properties: bool,
+    pub custom_input_schema: Option<serde_json::Value>,
 }
 
 impl std::fmt::Debug for Tool {
@@ -49,6 +53,8 @@ impl std::fmt::Debug for Tool {
             .field("params", &self.params)
             .field("see_page", &self.see_page)
             .field("examples", &self.examples)
+            .field("additional_properties", &self.additional_properties)
+            .field("custom_input_schema", &self.custom_input_schema)
             .finish()
     }
 }
@@ -59,6 +65,10 @@ impl Tool {
     }
 
     pub fn input_schema(&self) -> serde_json::Value {
+        if let Some(ref schema) = self.custom_input_schema {
+            return schema.clone();
+        }
+
         let mut properties = serde_json::Map::new();
         let mut required_fields = Vec::new();
 
@@ -109,6 +119,17 @@ impl Tool {
                     );
                     prop.insert("items".to_string(), serde_json::json!({ "type": "string" }));
                 }
+                ParamType::Object => {
+                    prop.insert(
+                        "type".to_string(),
+                        serde_json::Value::String("object".to_string()),
+                    );
+                    prop.insert(
+                        "additionalProperties".to_string(),
+                        serde_json::Value::Bool(true),
+                    );
+                }
+                ParamType::Any => {}
             }
             if !p.description.is_empty() {
                 prop.insert(
@@ -127,7 +148,7 @@ impl Tool {
             "type": "object",
             "properties": properties,
             "required": required_fields,
-            "additionalProperties": false,
+            "additionalProperties": self.additional_properties,
         })
     }
 
@@ -155,18 +176,20 @@ impl Tool {
             }
         };
 
-        let declared_names: Vec<&str> = self.params.iter().map(|p| p.name.as_str()).collect();
-        for key in obj.keys() {
-            if !declared_names.contains(&key.as_str()) {
-                let allowed = declared_names.join(", ");
-                let mut err = format!(
-                    "Unknown argument '{}'. Declared arguments: [{}].",
-                    key, allowed
-                );
-                if let Some(ref see) = self.see_page {
-                    err.push_str(&format!(" See {scheme}://doc/{see} for usage."));
+        if !self.additional_properties && self.custom_input_schema.is_none() {
+            let declared_names: Vec<&str> = self.params.iter().map(|p| p.name.as_str()).collect();
+            for key in obj.keys() {
+                if !declared_names.contains(&key.as_str()) {
+                    let allowed = declared_names.join(", ");
+                    let mut err = format!(
+                        "Unknown argument '{}'. Declared arguments: [{}].",
+                        key, allowed
+                    );
+                    if let Some(ref see) = self.see_page {
+                        err.push_str(&format!(" See {scheme}://doc/{see} for usage."));
+                    }
+                    return Err(ToolResult::error(err));
                 }
-                return Err(ToolResult::error(err));
             }
         }
 
@@ -211,6 +234,8 @@ impl Tool {
                         false
                     }
                 }
+                ParamType::Object => val.is_object(),
+                ParamType::Any => true,
             };
 
             if !type_ok {
@@ -228,6 +253,8 @@ impl Tool {
                     ParamType::Boolean => "a boolean".to_string(),
                     ParamType::Enum(variants) => format!("one of {:?}", variants),
                     ParamType::StringArray => "an array of strings".to_string(),
+                    ParamType::Object => "an object".to_string(),
+                    ParamType::Any => "any value".to_string(),
                 };
                 let mut err = format!(
                     "Invalid argument '{}': expected {expected}, got {val}.",
@@ -252,6 +279,8 @@ pub struct ToolBuilder {
     examples: Vec<serde_json::Value>,
     handler: Option<ToolHandler>,
     skip_validation: bool,
+    additional_properties: bool,
+    custom_input_schema: Option<serde_json::Value>,
 }
 
 impl ToolBuilder {
@@ -264,6 +293,8 @@ impl ToolBuilder {
             examples: Vec::new(),
             handler: None,
             skip_validation: false,
+            additional_properties: false,
+            custom_input_schema: None,
         }
     }
 
@@ -298,6 +329,16 @@ impl ToolBuilder {
         self
     }
 
+    pub fn additional_properties(mut self, allow: bool) -> Self {
+        self.additional_properties = allow;
+        self
+    }
+
+    pub fn input_schema(mut self, schema: serde_json::Value) -> Self {
+        self.custom_input_schema = Some(schema);
+        self
+    }
+
     pub fn handler<F>(mut self, handler: F) -> Self
     where
         F: Fn(serde_json::Value) -> HandlerResult<ToolResult> + Send + Sync + 'static,
@@ -314,6 +355,8 @@ impl ToolBuilder {
             see_page: self.see_page,
             examples: self.examples,
             skip_validation: self.skip_validation,
+            additional_properties: self.additional_properties,
+            custom_input_schema: self.custom_input_schema,
             handler: self.handler.unwrap_or_else(|| {
                 Arc::new(|_| ToolResult::error("Handler not implemented").into())
             }),

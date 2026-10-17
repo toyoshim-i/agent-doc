@@ -172,3 +172,115 @@ Details.
         "Registering duplicate tool name 'configure_pin' must be rejected"
     );
 }
+
+#[cfg(feature = "mcp")]
+#[test]
+fn test_b3_object_params_and_dynamic_schemas() {
+    use agent_man::mcp::{ParamType, Tool};
+    use agent_man::DocEngine;
+    use serde_json::json;
+
+    let mut engine = DocEngine::new("karakuri").with_scheme("karakuri");
+
+    // 1. Tool with Object, Any, and additional_properties(true)
+    let operate_tool = Tool::builder("operate", "Execute instrument operation")
+        .param(
+            "operation",
+            ParamType::Enum(vec!["nudge".into(), "reset".into()]),
+            "heading of the operation",
+            true,
+        )
+        .param("with", ParamType::Object, "payload object", false)
+        .param("misc", ParamType::Any, "arbitrary value", false)
+        .additional_properties(true)
+        .handler(|args| {
+            let op = args["operation"].as_str().unwrap_or("");
+            let with_ms = args["with"]["ms"].as_i64().unwrap_or(0);
+            agent_man::mcp::ToolResult::text(format!("Executed {op} with ms={with_ms}")).into()
+        })
+        .build();
+
+    engine.register_tool(operate_tool).unwrap();
+
+    let tools = engine.mcp_list_tools();
+    let op_def = tools.iter().find(|t| t.name == "operate").unwrap();
+    let schema = &op_def.input_schema;
+
+    // Schema assertions
+    assert_eq!(schema["type"], "object");
+    assert_eq!(schema["additionalProperties"], true);
+    assert_eq!(schema["properties"]["with"]["type"], "object");
+    assert_eq!(schema["properties"]["with"]["additionalProperties"], true);
+    assert_eq!(schema["properties"]["with"]["description"], "payload object");
+    assert_eq!(schema["properties"]["misc"], json!({ "description": "arbitrary value" }));
+
+    // Valid call with nested object and unknown extra properties (allowed by additional_properties(true))
+    let valid_call = engine
+        .mcp_call_tool(
+            "operate",
+            json!({
+                "operation": "nudge",
+                "with": { "ms": 5 },
+                "misc": [1, 2, "three"],
+                "unknown_extra_field": "should be allowed"
+            }),
+        )
+        .unwrap();
+    assert!(!valid_call.is_error);
+    assert_eq!(valid_call.text_content(), "Executed nudge with ms=5");
+
+    // Invalid call when `with` is not an object
+    let invalid_call = engine
+        .mcp_call_tool(
+            "operate",
+            json!({
+                "operation": "nudge",
+                "with": "not-an-object"
+            }),
+        )
+        .unwrap();
+    assert!(invalid_call.is_error);
+    assert!(invalid_call.text_content().contains("expected an object"));
+
+    // 2. Tool with custom input_schema override
+    let custom_schema = json!({
+        "type": "object",
+        "properties": {
+            "nodes": {
+                "type": "array",
+                "items": { "type": "object" }
+            }
+        },
+        "required": ["nodes"],
+        "additionalProperties": false
+    });
+
+    let custom_tool = Tool::builder("write_procedure", "Batch write procedure nodes")
+        .input_schema(custom_schema.clone())
+        .handler(|args| {
+            let count = args["nodes"].as_array().map(|a| a.len()).unwrap_or(0);
+            agent_man::mcp::ToolResult::text(format!("Updated {count} nodes")).into()
+        })
+        .build();
+
+    engine.register_tool(custom_tool).unwrap();
+
+    let tools2 = engine.mcp_list_tools();
+    let write_def = tools2.iter().find(|t| t.name == "write_procedure").unwrap();
+    assert_eq!(write_def.input_schema, custom_schema);
+
+    let write_call = engine
+        .mcp_call_tool(
+            "write_procedure",
+            json!({
+                "nodes": [
+                    { "layer": "base", "index": 0, "source": "val1" },
+                    { "layer": "base", "index": 1, "source": "val2" }
+                ]
+            }),
+        )
+        .unwrap();
+    assert!(!write_call.is_error);
+    assert_eq!(write_call.text_content(), "Updated 2 nodes");
+}
+
